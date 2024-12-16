@@ -236,7 +236,7 @@ JANET_FN(cfun_i2c_find,
 
     for (int i = 0; i < chans; i++) {
         FT_DEVICE_LIST_INFO_NODE chaninfo;
-        FT_STATUS status = I2C_GetChannelInfo(i, &chaninfo);
+        status = I2C_GetChannelInfo(i, &chaninfo);
         if (status != FT_OK) {
             return set_status_dyn(status, janet_wrap_nil());
         } else {        

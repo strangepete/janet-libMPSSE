@@ -233,7 +233,7 @@ JANET_FN(cfun_spi_find,
 
     for (int i = 0; i < chans; i++) {
         FT_DEVICE_LIST_INFO_NODE chaninfo;
-        FT_STATUS status = SPI_GetChannelInfo(i, &chaninfo);
+        status = SPI_GetChannelInfo(i, &chaninfo);
         if (status != FT_OK) {
             return set_status_dyn(status, janet_wrap_nil());
         } else {        
