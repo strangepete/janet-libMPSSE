@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/c",
+                "${workspaceFolder}/LibMPSSE_1.0.5/release/libftd2xx",
+                "${workspaceFolder}/LibMPSSE_1.0.5/release/include",
+                "${env:JANET_HEADERPATH}"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "FTDIMPSSE_STATIC",
+                "FT_VER_MAJOR=1",
+                "FT_VER_MINOR=0",
+                "FT_VER_BUILD=5"
+            ],
+            "windowsSdkVersion": "10.0.22621.0",
+            "compilerPath": "cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}
