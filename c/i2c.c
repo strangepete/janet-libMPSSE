@@ -38,9 +38,9 @@ static const JanetAbstractType channel_type = {
 /* C Functions */
 /***************/
 
-// Save the FT return status to dyn :err, and return the value directly.
+// Save the FT return status to dyn :i2c-err, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
-    janet_setdyn("err", janet_ckeywordv(ft_status_string[status]));
+    janet_setdyn("i2c-err", janet_ckeywordv(ft_status_string[status]));
     return value;
 }
 
@@ -68,9 +68,9 @@ JANET_FN(cfun_i2c_get_err,
     "* `:invalid-args`\n" // 16
     "* `:not-supported`\n"
     "* `:other-error`\n\n"
-    "Note: currently a wrapper for (dyn :err)") {
+    "Note: currently a wrapper for (dyn :i2c-err)") {
     janet_arity(argc, 0, 1);
-    return janet_dyn("err");
+    return janet_dyn("i2c-err");
 }
 
 JANET_FN(cfun_i2c_channelcount,
