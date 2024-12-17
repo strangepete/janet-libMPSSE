@@ -68,8 +68,8 @@ This is an example flow for opening a new I2C channel:
 
 (if-not (zero? numchan)
   (do
-      (def c (i2c/open 1))                          # Open the first channel
-  (if (= :ok (i2c/err c))                           # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
+    (def c (i2c/open 1))                          # Open the first channel
+    (if (= :ok (i2c/err c))                           # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
       (i2c/write-opt c :start :stop)				
       (i2c/read-opt c :start :stop :nak-last-byte)  # Transfer settings can be changed prior to each read/write call
       
