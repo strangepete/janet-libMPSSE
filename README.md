@@ -6,7 +6,7 @@ The Multi-Protocol Synchronous Serial Engine (MPSSE) is a piece of hardware avai
 
 LibMPSSE is a library written by FTDI to simplify I2C, SPI and JTAG development, as configuring the underlying MPSSE hardware is fairly complex. JTAG is not yet implemented here.
 
-This module is an alpha-phase project written by a hobbyist -- all comments and nitpicks welcome.
+This module is an alpha-phase project written by a hobbyist -- all comments and nitpicks welcomed.
 
 API is documented in api.md and is in flux. Function naming and usage generally follows libMPSSE, though some changes were made for ergonomics, *e.g, `I2C_GetChannelInfo` -> `(i2c/info)`*
 
@@ -45,7 +45,7 @@ The module import is:
 ```janet
 (use libmpsse)
 ```
-which loads two submodules, `i2c/` and `spi/` which are generally the same, except the I2C functions take a 7-bit I2C address. Many functions can be called as methods on an open channel, such as `(i2c/err)` or `(:err c)` and `(:close c)`
+which loads two submodules, `i2c/` and `spi/` which are generally the same, except the I2C functions take a 7-bit I2C address. Many functions can be called as methods on an opened channel, such as `(i2c/err)` or `(:err c)` and `(:close c)`
 
 Getting a channel's information:
 ```janet
@@ -63,7 +63,7 @@ Getting a channel's information:
 ```
 
 This is an example flow for opening a new I2C channel:
-```
+```janet
 (def numchan (i2c/channels)) 
 
 (if-not (zero? numchan)
@@ -71,7 +71,7 @@ This is an example flow for opening a new I2C channel:
       (def c (i2c/open 1))                          # Open the first channel
   (if (= :ok (i2c/err c))                           # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
       (i2c/write-opt c :start :stop)				
-      (i2c/read-opt c :start :stop :nak-last-byte)  # Transfer settings can be changed per read/write call
+      (i2c/read-opt c :start :stop :nak-last-byte)  # Transfer settings can be changed prior to each read/write call
       
       (i2c/init c :fast)                            # Initialize to 400kbs
 
@@ -84,7 +84,9 @@ This is an example flow for opening a new I2C channel:
       (i2c/close c))))                              # Currently, a closed channel object cannot be reopened; use (i2c/open) to create a new one
 ```
 
-The various transfer and config options are lightly documented in api.md, for a full description see the FTDI libMPSSE Application Notes 177 (i2c) and 178 (spi)
+The various transfer and config options are lightly documented in [api-i2c.md](api-i2c.md) and [api-spi.md](api-spi.md), but for a full description see the FTDI libMPSSE Application Notes 177 (i2c) and 178 (spi) as some options are only available on specific devices.
+
+> The `/read` and `/write` functions are **blocking**, and `/channels` and `/info` are **not thread-safe**
 
 ## IMPORTANT!
 
