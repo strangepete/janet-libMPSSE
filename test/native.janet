@@ -1,4 +1,4 @@
-(use ../build/libmpsse)
+(use /build/libmpsse)
 
 # I2C
 (def chans (i2c/channels))
