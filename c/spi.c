@@ -67,7 +67,8 @@ JANET_FN(cfun_spi_get_err,
     "* `:eeprom-not-programmed`\n"
     "* `:invalid-args`\n" // 16
     "* `:not-supported`\n"
-    "* `:other-error`\n\n"
+    "* `:other-error`\n"
+    "* `:device-list-not-ready`\n\n"
     "Note: currently a wrapper for (dyn :spi-err)") {
     janet_arity(argc, 0, 1);
     return janet_dyn("spi-err");

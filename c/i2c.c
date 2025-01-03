@@ -67,7 +67,8 @@ JANET_FN(cfun_i2c_get_err,
     "* `:eeprom-not-programmed`\n"
     "* `:invalid-args`\n" // 16
     "* `:not-supported`\n"
-    "* `:other-error`\n\n"
+    "* `:other-error`\n"
+    "* `:device-list-not-ready`\n\n"
     "Note: currently a wrapper for (dyn :i2c-err)") {
     janet_arity(argc, 0, 1);
     return janet_dyn("i2c-err");

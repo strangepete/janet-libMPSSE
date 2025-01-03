@@ -78,6 +78,7 @@ The return status of the last executed I2C function as a keyword representing an
 * `:invalid-args`
 * `:not-supported`
 * `:other-error`
+* `:device-list-not-ready`
 
 Note: currently a wrapper for (dyn :err)
 
