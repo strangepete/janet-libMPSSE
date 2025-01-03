@@ -50,7 +50,7 @@ which loads two submodules, `i2c/` and `spi/` which are generally the same, exce
 Getting a channel's information:
 ```janet
 (use libmpsse)
-(i2c/channels)                                      # Number of hardware channels; some devices have multiple
+(i2c/channels)                                     # Number of hardware channels; some devices have multiple
 # => 1
 
 (i2c/info 1)
@@ -68,20 +68,20 @@ This is an example flow for opening a new I2C channel:
 
 (if-not (zero? numchan)
   (do
-    (def c (i2c/open 1))                          # Open the first channel
-    (if (= :ok (i2c/err c))                           # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
+    (def c (i2c/open 1))                           # Open the first channel
+    (when (= :ok (i2c/err c))                      # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
       (i2c/write-opt c :start :stop)				
-      (i2c/read-opt c :start :stop :nak-last-byte)  # Transfer settings can be changed prior to each read/write call
+      (i2c/read-opt c :start :stop :nak-last-byte) # Transfer settings can be changed prior to each read/write call
       
-      (i2c/init c :fast)                            # Initialize to 400kbs
+      (i2c/init c :fast)                           # Initialize to 400kbs
 
-      (i2c/write c 0x3C 2 @"\x40\x00")              # Write 2 bytes to address 0x3C
+      (:write c 0x3C 2 @"\x40\x00")                # Write 2 bytes to address 0x3C
 
       (def buf @"")
-      (i2c/read c 0x3C 2 buf)                       # Read 2 bytes from address 0x3C to buffer.
-                                                    # This will append if buffer not empty.
+      (:read c 0x3C 2 buf)                         # Read 2 bytes from address 0x3C to buffer.
+                                                   # This will append if buffer not empty.
   
-      (i2c/close c))))                              # Currently, a closed channel object cannot be reopened; use (i2c/open) to create a new one
+      (:close c))))                                # Currently a closed channel object cannot be reopened; use (i2c/open) to create a new one
 ```
 
 The various transfer and config options are lightly documented in [api-i2c.md](api-i2c.md) and [api-spi.md](api-spi.md), but for a full description see the FTDI libMPSSE Application Notes 177 (i2c) and 178 (spi) as some options are only available on specific devices.
