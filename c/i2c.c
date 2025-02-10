@@ -536,6 +536,8 @@ JANET_FN(cfun_i2c_devicewrite,
         janet_panicf("i2c address %d is out of range. Expected <= 127.", address);
 
     uint32_t size = janet_getinteger(argv, 2);
+    if (size <= 0)
+        janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)

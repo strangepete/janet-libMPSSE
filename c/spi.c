@@ -471,6 +471,8 @@ JANET_FN(cfun_spi_devicewrite,
     janet_fixarity(argc, 3);
 
     uint32_t size = janet_getinteger(argv, 1);
+    if (size <= 0)
+        janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
@@ -511,6 +513,8 @@ JANET_FN(cfun_spi_readwrite,
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
     uint32_t size = janet_getuinteger(argv, 1);
+    if (size <= 0)
+        janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
     JanetBuffer *sendbuf = janet_getbuffer(argv, 2);
     if (size < sendbuf->count)
