@@ -26,10 +26,14 @@
                       "-ILibMPSSE_1.0.5/release/libftd2xx"
                       "-ILibMPSSE_1.0.5/release/source"]))
 
+(def ldflags (case (os/which)
+               :windows [;default-ldflags
+                         "/DEBUG"]
+               :linux [;default-ldflags]))
 (declare-native
   :name "libmpsse"
   :cflags cflags
-  :ldflags [;default-ldflags ]
+  :ldflags ldflags
   :source @["LibMPSSE_1.0.5/release/source/ftdi_mid.c"
             "LibMPSSE_1.0.5/release/source/ftdi_infra.c"
             "LibMPSSE_1.0.5/release/source/ftdi_spi.c"
