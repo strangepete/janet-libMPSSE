@@ -84,7 +84,7 @@ The return status of the last executed SPI function as a keyword representing an
 * `:other-error`
 * `:device-list-not-ready`
 
-Note: currently a wrapper for (dyn :err)
+Note: currently a wrapper for (dyn :spi-err)
 
 [20]: c/spi.c#L71
 
