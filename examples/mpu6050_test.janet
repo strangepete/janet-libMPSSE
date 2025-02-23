@@ -16,15 +16,16 @@
 
 # WHO_AM_I is used as a method to confirm a properly configured 
 #  connection, as the device should return its own i2c address.
-(prin "Waiting for device response...")
-(while (nil? (mpu/who-am-i))
+(prin "Waiting for device response from 0x68...")
+(var me nil)
+(while (nil? (set me (mpu/who-am-i)))
   (prin ".")
   (os/sleep 1))
 (print "")
 
-(if-not (= (mpu/who-am-i) 0x68)
+(if-not (mpu/who-am-i 0x68)
   (do
-    (print "who-am-i: Device address mismatch")
+    (printf "who-am-i: Device address mismatch: 0x%x" me)
     (os/exit 1)))
 (printf "I am : 0x%X" (mpu/who-am-i))
 (printf "Temperature: %-.1f°F" (mpu/get-temp :f)) 
