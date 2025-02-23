@@ -102,7 +102,7 @@
   (def b @"")
   (i2c-write 1 (reg :WHO_AM_I))
   (i2c-read 1 b)
-  (if (= :ok (dyn :err))
+  (if (= :ok (i2c/err))
     (get b 0)
     nil))
 
