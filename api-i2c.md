@@ -92,7 +92,7 @@ The return status of the last executed I2C function as a keyword representing an
 * `:other-error`
 * `:device-list-not-ready`
 
-Note: currently a wrapper for (dyn :i2c-err)
+Note: currently a wrapper for (dyn :ft-err)
 
 [5]: c/i2c.c#L72
 

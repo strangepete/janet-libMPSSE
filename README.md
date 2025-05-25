@@ -64,39 +64,33 @@ Getting a channel's information:
 
 This is an example flow for opening a new I2C channel:
 ```janet
-(def numchan (i2c/channels)) 
-
-(if-not (zero? numchan)
-  (do
-    (def c (i2c/open 1))                           # Open the first channel
-    (when (= :ok (i2c/err c))                      # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
-      (i2c/write-opt c :start :stop)				
-      (i2c/read-opt c :start :stop :nak-last-byte) # Transfer settings can be changed prior to each read/write call
-      
-      (i2c/init c :fast)                           # Initialize to 400kbs
-
-      (:write c 0x3C 2 @"\x40\x00")                # Write 2 bytes to address 0x3C
-
-      (def buf @"")
-      (:read c 0x3C 2 buf)                         # Read 2 bytes from address 0x3C to buffer.
-                                                   # This will append if buffer not empty.
+(if (> (i2c/channels) 0)
+  (with [c (i2c/open 1)]                         # Open the first channel
+    (when (not= :ok (i2c/err c))                 # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
+      (error (:err c)))
+    (i2c/write-opt c :start :stop)				
+    (i2c/read-opt c :start :stop :nak-last-byte) # Transfer settings can be changed prior to each read/write call
   
-      (:close c))))                                # Currently a closed channel object cannot be reopened; use (i2c/open) to create a new one
+    (i2c/init c :fast)                           # Initialize to 400kbs
+
+    (:write c 0x3C 2 @"\x40\x00")                # Write 2 bytes to address 0x3C
+
+    (def buf @"")
+    (:read c 0x3C 2 buf)                         # Append 2 bytes from address 0x3C to buffer
+
+    (:close c))                                  # Currently a closed channel object cannot be reopened; use (i2c/open) to create a new one
+  (print "no channel found"))
 ```
 
 The various transfer and config options are lightly documented in [api-i2c.md](api-i2c.md) and [api-spi.md](api-spi.md), but for a full description see the FTDI libMPSSE Application Notes 177 (i2c) and 178 (spi) as some options are only available on specific devices.
 
 > The `/read` and `/write` functions are **blocking**, and `/channels` and `/info` are **not thread-safe**
 
-## IMPORTANT!
-
-Incorrect wiring or commands can potentially destroy the device you are working with; be sure of the byte sequences you are sending, or keep a backup device handy.
-
 ## Notes
 
 * libMPSSE can **_only operate as an I2C/SPI bus master_**. Many GPS devices also talk as master, and as such cannot be used to get nema messages :(
 * JTAG is planned but not yet implemented.
-* On linux, [libftdi](https://www.intra2net.com/en/developer/libftdi/) ***is not*** d2xx. Though I think it would be worth targeting next, being open source and easily cross-platform.
+* On linux, [libftdi](https://www.intra2net.com/en/developer/libftdi/) ***is not*** d2xx; I think it would be worth targeting next, being open source and easily cross-platform.
 
 ## Tested Devices
 
