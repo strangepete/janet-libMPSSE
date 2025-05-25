@@ -319,7 +319,15 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 			DWORD bitsToTransfer, UCHAR *buffer, UCHAR *ack, LPDWORD bytesTransferred,
 			uint32 options);
 
-
+/*!
+* \brief  This function prints the device info and its clock rate.
+* \param  void
+* \return Returns status code of type FT_STATUS(see D2XX Programmer's Guide)
+* \sa
+* \note
+* \warning
+*/ 
+static FT_STATUS I2C_DisplayList(void);
 /******************************************************************************/
 /*								Global variables							  */
 /******************************************************************************/
@@ -1117,7 +1125,7 @@ static FT_STATUS I2C_FastWrite(FT_HANDLE handle, UCHAR deviceAddress,
 	{/* size is in bytes */
 	    bitsToTransfer = sizeToTransfer * 8;
 	}
-	bytesToTransfer = (bitsToTransfer > 0)?(((bitsToTransfer/8)==0)?1:((bitsToTransfer/8)+1)):(0);
+	bytesToTransfer = (bitsToTransfer + 7) / 8;
 
 	/* Calculate size of required buffer */
 	sizeTotal = (bytesToTransfer*(6
@@ -1328,7 +1336,7 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 	{/* size is in bytes */
 	    bitsToTransfer = sizeToTransfer * 8;
 	}
-	bytesToTransfer = (bitsToTransfer > 0) ? (((bitsToTransfer/8)==0)?1:(bitsToTransfer/8)): (0);
+	bytesToTransfer = (bitsToTransfer + 7) / 8;
 
 	/* Calculate size of required buffer */
 	sizeTotal = (bytesToTransfer*12) /* the size of data itself */
@@ -1423,13 +1431,13 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 		{
 			outBuffer[i++] = MPSSE_CMD_SET_DATA_BITS_LOWBYTE;
 			outBuffer[i++] = VALUE_SCLLOW_SDALOW ;  
-			outBuffer[i++] = DIRECTION_SCLOUT_SDAIN;
+			outBuffer[i++] = DIRECTION_SCLOUT_SDAOUT;
 
-        // Burn off one I2C bit time
-       outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;                                                                      //
+			// Burn off one I2C bit time
+			outBuffer[i++] = MPSSE_CMD_DATA_OUT_BITS_NEG_EDGE;
 			outBuffer[i++] = 0; /*0x00 = 1bit; 0x07 = 8bits*/ 
-        outBuffer[i++] = (j<(bitsToTransfer-1))?(SEND_ACK):	\
-			((options & I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE)?SEND_NACK:SEND_ACK);
+			outBuffer[i++] = ((j + bitsInThisTransfer) < bitsToTransfer)?(SEND_ACK):	\
+				((options & I2C_TRANSFER_OPTIONS_NACK_LAST_BYTE)?SEND_NACK:SEND_ACK);
 		}
 		j+= bitsInThisTransfer;
 	}
@@ -1478,10 +1486,7 @@ static FT_STATUS I2C_FastRead(FT_HANDLE handle, UCHAR deviceAddress,
 	}
 
 	/* read the actual data from the MPSSE-chip into the host system */
-	if (options & I2C_TRANSFER_OPTIONS_FAST_TRANSFER_BYTES)
-		status = FT_Channel_Read(I2C, handle, bytesToTransfer, buffer, &bytesRead);
-	else
-		status = FT_Channel_Read(I2C, handle, bytesToTransfer+1, buffer, &bytesRead);
+	status = FT_Channel_Read(I2C, handle, bytesToTransfer, buffer, &bytesRead);
 	CHECK_STATUS(status);
 
 	INFRA_FREE(outBuffer);

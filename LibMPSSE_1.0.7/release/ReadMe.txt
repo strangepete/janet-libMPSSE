@@ -16,7 +16,7 @@ The library is released as a DLL and a LIB file, and accompanying source code.
 Installing the MPSSE library and DLL
 ------------------------------------
 
-1.  Unzip libmpsse-windows-1.0.5.zip
+1.  Unzip libmpsse-windows-1.0.7.zip
 
 This unpacks the archive, creating the following directory structure:
 

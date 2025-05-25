@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110127
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright Â© 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -57,6 +57,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include "ftd2xx.h"
 
 
@@ -188,9 +189,9 @@ typedef signed char   int8;
 typedef signed short  int16;
 typedef signed long long int64;
 
-#ifndef __cplusplus   // bool is defined already in C++
-  typedef BOOL	bool; // bool is defined already in C++
-#endif                // bool is defined already in C++
+// #ifndef __cplusplus   // bool is defined already in C++
+//   typedef BOOL	bool; // bool is defined already in C++
+// #endif                // bool is defined already in C++
 
 typedef unsigned int   uint32;
 typedef signed int   int32;

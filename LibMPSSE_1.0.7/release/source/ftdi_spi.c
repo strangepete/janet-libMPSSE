@@ -840,7 +840,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 }
 #endif
 
-FTDIMPSSE_API FT_STATUS SPI_IsBusy(FT_HANDLE handle, bool *state)
+FTDIMPSSE_API FT_STATUS SPI_IsBusy(FT_HANDLE handle, BOOL *state)
 {
 	FT_STATUS status = FT_OTHER_ERROR;
 	DWORD noOfBytes = 0, noOfBytesTransferred = 0;
@@ -933,7 +933,7 @@ FTDIMPSSE_API FT_STATUS SPI_ChangeCS(FT_HANDLE handle, DWORD configOptions)
 	return status;
 }
 
-FT_STATUS SPI_ToggleCS(FT_HANDLE handle, bool state)
+FT_STATUS SPI_ToggleCS(FT_HANDLE handle, BOOL state)
 {
 	ChannelConfig *config = NULL;
 	bool activeLow;

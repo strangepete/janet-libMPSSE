@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110317
  *
- * Copyright � 2000-2014 Future Technology Devices International Limited
+ * Copyright © 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -43,7 +43,7 @@
 		fprintf(stderr, "dlsym failed: %s\n", dlerror());};
 #else // _WIN32
 	#define GET_FUNC(libHandle, symbol) GetProcAddress(libHandle, symbol)
-	#define CHECK_SYMBOL(exp) {if (GetLastError())\
+	#define CHECK_SYMBOL(exp) {if (exp == NULL)\
 		fprintf(stderr, "GetProcAddress failed: 0x%x\n", GetLastError());};
 #endif // _WIN32
 
@@ -229,16 +229,27 @@ FTDIMPSSE_API void Init_libMPSSE(void)
 	(void)status;
 	FN_ENTER;
 
-/* Load D2XX dynamic library */
-#ifndef _WIN32
+#if defined(__linux__)
+	// Load libftd2xx.so on Linux
 	hdll_d2xx = dlopen("libftd2xx.so", RTLD_LAZY);
-	if (!hdll_d2xx) 
-	{ 
+	if (!hdll_d2xx) { 
 		fprintf(stderr, "dlopen failed: %s\n", dlerror()); 
 	}
-#else // _WIN32
+#elif defined(__APPLE__)
+	// Load libftd2xx.dylib on macOS
+	hdll_d2xx = dlopen("libftd2xx.dylib", RTLD_LAZY);
+	if (!hdll_d2xx) { 
+		fprintf(stderr, "dlopen failed: %s\n", dlerror()); 
+	}
+#elif defined(_WIN32)
+	// Load ftd2xx.dll on Windows
 	hdll_d2xx = LoadLibrary(L"ftd2xx.dll");
-#endif // _WIN32
+	if (!hdll_d2xx) {
+		fprintf(stderr, "LoadLibrary failed: %lu\n", GetLastError());
+	}
+#else
+	#error "Unsupported platform"
+#endif
 
 	CHECK_NULL(hdll_d2xx);
 
