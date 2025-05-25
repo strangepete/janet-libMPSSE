@@ -566,6 +566,30 @@ JANET_FN(cfun_i2c_devicewrite,
     return set_status_dyn(status, janet_wrap_integer(writesz));
 }
 
+static Janet version_to_tuple(uint32_t ver) {
+    Janet vals[3] = {
+        janet_wrap_integer(((ver >> 16) & 0xF) + (((ver >> 20) & 0xF) * 10)),
+        janet_wrap_integer(((ver >> 8) & 0xF)  + (((ver >> 12) & 0xF) * 10)),
+        janet_wrap_integer((ver & 0xF)         + (((ver >> 4)  & 0xF) * 10))};
+    
+    return janet_wrap_tuple(janet_tuple_n(vals, 3));
+}
+
+JANET_FN(cfun_ft_ver_libmpsse,
+    "(i2c/version)",
+    "Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]") {
+    uint32_t libmpsse, ftd2xx;
+
+    FT_STATUS status = Ver_libMPSSE(&libmpsse, &ftd2xx);
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    
+    Janet vals[2] = {version_to_tuple(libmpsse),
+                     version_to_tuple(ftd2xx)};
+
+    return janet_wrap_tuple(janet_tuple_n(vals, 2));
+}
+
 static JanetMethod channel_methods[] = {
     {"err",             cfun_i2c_get_err},
     {"info",            cfun_i2c_getchannelinfo},
@@ -624,6 +648,7 @@ void i2c_register(JanetTable *env) {
         JANET_REG("i2c/write",          cfun_i2c_devicewrite),
         JANET_REG("i2c/gpio-read",      cfun_ft_gpio_read),
         JANET_REG("i2c/gpio-write",     cfun_ft_gpio_write),
+        JANET_REG("ft/version",         cfun_ft_ver_libmpsse),
         JANET_REG_END
     };
     janet_cfuns_ext(env, "i2c", cfuns);
