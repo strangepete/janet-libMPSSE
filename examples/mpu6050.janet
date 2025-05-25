@@ -97,7 +97,7 @@
 
 (defn who-am-i
   "Should respond with device address, which is 0x68 by default. Used to confirm an established connection.\n\n
-   Returns a 127-bit address, or nil on error. Given optional expected address, returns a boolean comparison."
+   Returns a 7-bit address, or nil on error. Given optional expected address, returns a boolean comparison."
   [&opt address]
   (def b @"")
   (i2c-write 1 (reg :WHO_AM_I))
