@@ -40,7 +40,7 @@ static const JanetAbstractType channel_type = {
 
 // Save the FT return status to dyn :spi-err, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
-    janet_setdyn("spi-err", janet_ckeywordv(ft_status_string[status]));
+    janet_setdyn("ft-err", janet_ckeywordv(ft_status_string[status]));
     return value;
 }
 
@@ -69,9 +69,9 @@ JANET_FN(cfun_spi_get_err,
     "* `:not-supported`\n"
     "* `:other-error`\n"
     "* `:device-list-not-ready`\n\n"
-    "Note: currently a wrapper for (dyn :spi-err)") {
+    "Note: currently a wrapper for (dyn :ft-err)") {
     janet_arity(argc, 0, 1);
-    return janet_dyn("spi-err");
+    return janet_dyn("ft-err");
 }
 
 JANET_FN(cfun_spi_channelcount,
