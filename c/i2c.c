@@ -576,7 +576,7 @@ static Janet version_to_tuple(uint32_t ver) {
 }
 
 JANET_FN(cfun_ft_ver_libmpsse,
-    "(i2c/version)",
+    "(ft/version)",
     "Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]") {
     uint32_t libmpsse, ftd2xx;
 

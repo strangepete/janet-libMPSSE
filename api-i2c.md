@@ -1,11 +1,23 @@
 # libmpsse I2C API
 
-[i2c/channels](#i2cchannels), [i2c/close](#i2cclose), [i2c/config](#i2cconfig), [i2c/err](#i2cerr), [i2c/find-by](#i2cfind-by), [i2c/gpio-read](#i2cgpio-read), [i2c/gpio-write](#i2cgpio-write), [i2c/id](#i2cid), [i2c/info](#i2cinfo), [i2c/init](#i2cinit), [i2c/is-open](#i2cis-open), [i2c/open](#i2copen), [i2c/read](#i2cread), [i2c/read-opt](#i2cread-opt), [i2c/write](#i2cwrite), [i2c/write-opt](#i2cwrite-opt)
+[ft/version](#ftversion), [i2c/channels](#i2cchannels), [i2c/close](#i2cclose), [i2c/config](#i2cconfig), [i2c/err](#i2cerr), [i2c/find-by](#i2cfind-by), [i2c/gpio-read](#i2cgpio-read), [i2c/gpio-write](#i2cgpio-write), [i2c/id](#i2cid), [i2c/info](#i2cinfo), [i2c/init](#i2cinit), [i2c/is-open](#i2cis-open), [i2c/open](#i2copen), [i2c/read](#i2cread), [i2c/read-opt](#i2cread-opt), [i2c/write](#i2cwrite), [i2c/write-opt](#i2cwrite-opt)
 
+
+## ft/version
+
+**cfunction**  | [source][1]
+
+```janet
+(ft/version)
+```
+
+Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]
+
+[1]: c/i2c.c#L580
 
 ## i2c/channels
 
-**cfunction**  | [source][1]
+**cfunction**  | [source][2]
 
 ```janet
 (i2c/channels)
@@ -17,11 +29,11 @@ Note: The number of ports available in each chip is different, but must be an MP
 
 This function is **not thread-safe**.
 
-[1]: c/i2c.c#L81
+[2]: c/i2c.c#L82
 
 ## i2c/close
 
-**cfunction**  | [source][2]
+**cfunction**  | [source][3]
 
 ```janet
 (i2c/close channel)
@@ -29,11 +41,11 @@ This function is **not thread-safe**.
 
 Closes the specified channel. Returns `true` if successful. Sets `:err` to return status.
 
-[2]: c/i2c.c#L442
+[3]: c/i2c.c#L443
 
 ## i2c/config
 
-**cfunction**  | [source][3]
+**cfunction**  | [source][4]
 
 ```janet
 (i2c/config channel &opt kw ...)
@@ -46,11 +58,11 @@ Set channel config options. Takes zero, or more keywords:
 
 Note: 3-phase clocking only available on hi-speed devices, not the FT2232D. Drive-only-zero is only available on the FT232H.
 
-[3]: c/i2c.c#L372
+[4]: c/i2c.c#L373
 
 ## i2c/err
 
-**cfunction**  | [source][4]
+**cfunction**  | [source][5]
 
 ```janet
 (i2c/err)
@@ -82,11 +94,11 @@ The return status of the last executed I2C function as a keyword representing an
 
 Note: currently a wrapper for (dyn :i2c-err)
 
-[4]: c/i2c.c#L71
+[5]: c/i2c.c#L72
 
 ## i2c/find-by
 
-**cfunction**  | [source][5]
+**cfunction**  | [source][6]
 
 ```janet
 (i2c/find-by kw value)
@@ -101,11 +113,11 @@ Find a channel matching an explicit identifer. Takes a keyword and value:
 
 Returns a channel `index` or `nil` on failure. Sets `:err` to return status.
 
-[5]: c/i2c.c#L189
+[6]: c/i2c.c#L190
 
 ## i2c/gpio-read
 
-**cfunction**  | [source][6]
+**cfunction**  | [source][7]
 
 ```janet
 (i2c/gpio-read channel)
@@ -117,11 +129,11 @@ Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return stat
 
 Note: **Must call write-gpio to initialize before reading**. See the libMPSSE.
 
-[6]: c/i2c.c#L479
+[7]: c/i2c.c#L480
 
 ## i2c/gpio-write
 
-**cfunction**  | [source][7]
+**cfunction**  | [source][8]
 
 ```janet
 (i2c/gpio-write channel dir value)
@@ -133,11 +145,11 @@ Returns `nil`. Sets `:err` to return status.
 
 Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.
 
-[7]: c/i2c.c#L461
+[8]: c/i2c.c#L462
 
 ## i2c/id
 
-**cfunction**  | [source][8]
+**cfunction**  | [source][9]
 
 ```janet
 (i2c/id channel)
@@ -145,11 +157,11 @@ Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in
 
 Takes an `<i2c/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.
 
-[8]: c/i2c.c#L135
+[9]: c/i2c.c#L136
 
 ## i2c/info
 
-**cfunction**  | [source][9]
+**cfunction**  | [source][10]
 
 ```janet
 (i2c/info index)
@@ -169,11 +181,11 @@ On success, returns a table:
 
 This function is **not thread-safe**.
 
-[9]: c/i2c.c#L102
+[10]: c/i2c.c#L103
 
 ## i2c/init
 
-**cfunction**  | [source][10]
+**cfunction**  | [source][11]
 
 ```janet
 (i2c/init channel &opt clockrate latency)
@@ -191,11 +203,11 @@ Clock rate is one of the following keywords:
 
 Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, and Hi-speed devices (FT232H, FT2232H, FT4232H) is 1 to 255. Default is 255.
 
-[10]: c/i2c.c#L406
+[11]: c/i2c.c#L407
 
 ## i2c/is-open
 
-**cfunction**  | [source][11]
+**cfunction**  | [source][12]
 
 ```janet
 (i2c/is-open channel)
@@ -205,11 +217,11 @@ Returns true if a channel is open, or false if closed or invalid. Sets `:err` to
 
 Takes either an `<i2c/channel>` object, or 1-based `index`.
 
-[11]: c/i2c.c#L275
+[12]: c/i2c.c#L276
 
 ## i2c/open
 
-**cfunction**  | [source][12]
+**cfunction**  | [source][13]
 
 ```janet
 (i2c/open index)
@@ -221,11 +233,11 @@ Returns an `<i2c/channel>` if succesful, or `nil` on error. Sets `:err` to retur
 
 
 
-[12]: c/i2c.c#L145
+[13]: c/i2c.c#L146
 
 ## i2c/read
 
-**cfunction**  | [source][13]
+**cfunction**  | [source][14]
 
 ```janet
 (i2c/read channel address size buffer)
@@ -235,11 +247,13 @@ Read & append `size` n-bytes to `buffer` from I2C device at `address`.
 
 Returns bytes read. Sets `:err` to return status.
 
-[13]: c/i2c.c#L494
+This is a **blocking function**.
+
+[14]: c/i2c.c#L496
 
 ## i2c/read-opt
 
-**cfunction**  | [source][14]
+**cfunction**  | [source][15]
 
 ```janet
 (i2c/read-opt channel &opt kw ...)
@@ -256,11 +270,11 @@ Set I2C Read transfer options. Takes zero, or more keywords:
 
 
 
-[14]: c/i2c.c#L356
+[15]: c/i2c.c#L357
 
 ## i2c/write
 
-**cfunction**  | [source][15]
+**cfunction**  | [source][16]
 
 ```janet
 (i2c/write channel address size buffer)
@@ -270,11 +284,13 @@ Write `size` n-bytes of `buffer` to I2C channel/device `address`.
 
 Returns bytes written. Sets `:err` to return status.
 
-[15]: c/i2c.c#L528
+This is a **blocking function**.
+
+[16]: c/i2c.c#L531
 
 ## i2c/write-opt
 
-**cfunction**  | [source][16]
+**cfunction**  | [source][17]
 
 ```janet
 (i2c/write-opt channel &opt kw ...)
@@ -291,5 +307,4 @@ Set I2C Write transfer options. Takes zero, or more keywords:
 
 
 
-[16]: c/i2c.c#L340
-
+[17]: c/i2c.c#L341
