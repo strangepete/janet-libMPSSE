@@ -1,7 +1,7 @@
 // libMPSSE-I2C functions as documented in Application Note AN_177, Version 1.5
 
 #include "module.h"
-#include "../LibMPSSE_1.0.5/release/include/libmpsse_i2c.h"
+#include "../LibMPSSE_1.0.7/release/include/libmpsse_i2c.h"
 
 typedef struct {
     uint32_t        index;          // 1-based, as user-entered

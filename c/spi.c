@@ -1,7 +1,7 @@
 // libMPSSE-SPI functions as documented in Application Note AN_178, Version 1.2
 
 #include "module.h"
-#include "../LibMPSSE_1.0.5/release/include/libmpsse_spi.h"
+#include "../LibMPSSE_1.0.7/release/include/libmpsse_spi.h"
 
 typedef struct {
     uint32_t        index;          // 1-based, as user-entered
