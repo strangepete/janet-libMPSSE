@@ -5,7 +5,7 @@
   :author "Peter Rippe"
   :license "MIT"
   :url "https://github.com/strangepete/janet-libMPSSE"
-  :version "0.0.2")
+  :version "0.0.3")
 
 (if (= :linux (os/which))
   (eprintf "WARNING: Untested on Linux, please submit feedback.\n"))
@@ -14,17 +14,17 @@
               :windows [;default-cflags
                         "/DUNICODE"
                         "/D_UNICODE"
-                        "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=5" # libMPSSE version
+                        "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=7" # libMPSSE version
                         "/DFTDIMPSSE_STATIC"
-                        "/ILibMPSSE_1.0.5/release/include"
-                        "/ILibMPSSE_1.0.5/release/libftd2xx"]
+                        "/ILibMPSSE_1.0.7/release/include"
+                        "/ILibMPSSE_1.0.7/release/libftd2xx"]
               :linux [;default-cflags # linux is untested; compiles for me but always dies with OTHER_ERROR
-                      "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=5"
+                      "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=7"
                       "-DFTDIMPSSE_STATIC"
                       "-D_DEFAULT_SOURCE" # needed for usleep()
-                      "-ILibMPSSE_1.0.5/release/include"
-                      "-ILibMPSSE_1.0.5/release/libftd2xx"
-                      "-ILibMPSSE_1.0.5/release/source"]))
+                      "-ILibMPSSE_1.0.7/release/include"
+                      "-ILibMPSSE_1.0.7/release/libftd2xx"
+                      "-ILibMPSSE_1.0.7/release/source"]))
 
 (def ldflags (case (os/which)
                :windows [;default-ldflags
@@ -34,10 +34,10 @@
   :name "libmpsse"
   :cflags cflags
   :ldflags ldflags
-  :source @["LibMPSSE_1.0.5/release/source/ftdi_mid.c"
-            "LibMPSSE_1.0.5/release/source/ftdi_infra.c"
-            "LibMPSSE_1.0.5/release/source/ftdi_spi.c"
-            "LibMPSSE_1.0.5/release/source/ftdi_i2c.c"
+  :source @["LibMPSSE_1.0.7/release/source/ftdi_mid.c"
+            "LibMPSSE_1.0.7/release/source/ftdi_infra.c"
+            "LibMPSSE_1.0.7/release/source/ftdi_spi.c"
+            "LibMPSSE_1.0.7/release/source/ftdi_i2c.c"
             "c/module.c"
             "c/i2c.c"
             "c/spi.c"])
