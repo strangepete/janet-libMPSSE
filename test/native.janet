@@ -5,17 +5,17 @@
       d (ver 1)]
       (printf "libMPSSE Version: %d.%d.%d" ;l)
       (printf "ftd2xx Version: %d.%d.%d\n" ;d))
-(assert (= :ok (i2c/err)))
+(assert (= :ok (i2c/err)) (i2c/err))
 
 # I2C
 (def chans (i2c/channels))
-(assert (= :ok (i2c/err)))
+(assert (= :ok (i2c/err)) (i2c/err))
 (print "I2C channels found: " chans)
 (when (pos? chans)
     (print "Opening I2C channel #1...")
     (with [c (i2c/open 1)]
           (pp c)
-          (assert (= :ok (:err c)))
+          (assert (= :ok (:err c)) (i2c/err))
           (assert (not (nil? c)))
           (assert (:is-open c))
           (var ci (i2c/info c))
@@ -34,13 +34,13 @@
 
 # SPI
 (def chans (spi/channels))
-(assert (= :ok (spi/err)))
+(assert (= :ok (spi/err)) (spi/err))
 (print "SPI channels found: " chans)
 (when (pos? chans)
     (print "Opening SPI channel #1...")
     (with [c (spi/open 1)]
           (pp c)
-          (assert (= :ok (:err c)))
+          (assert (= :ok (:err c)) (spi/err))
           (assert (not (nil? c)))
           (assert (:is-open c))
           (assert (:close c))
