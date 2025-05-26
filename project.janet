@@ -9,19 +9,21 @@
 
 (def cflags (case (os/which)
               :windows [;default-cflags
+                      # "/DINFRA_DEBUG_ENABLE" # libmpsse offers *verbose* debugging
                         "/DUNICODE"
                         "/D_UNICODE"
                         "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=7" # libMPSSE version
                         "/DFTDIMPSSE_STATIC"
                         "/ILibMPSSE_1.0.7/release/include"
                         "/ILibMPSSE_1.0.7/release/libftd2xx"]
-              [;default-cflags 
-                      "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=7"
-                      "-DFTDIMPSSE_STATIC"
-                      "-D_DEFAULT_SOURCE" # needed for usleep()
-                      "-ILibMPSSE_1.0.7/release/include"
-                      "-ILibMPSSE_1.0.7/release/libftd2xx"
-                      "-ILibMPSSE_1.0.7/release/source"]))
+              [;default-cflags
+             # "-DINFRA_DEBUG_ENABLE"
+               "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=7"
+               "-DFTDIMPSSE_STATIC"
+               "-D_DEFAULT_SOURCE" # needed for usleep()
+               "-ILibMPSSE_1.0.7/release/include"
+               "-ILibMPSSE_1.0.7/release/libftd2xx"
+               "-ILibMPSSE_1.0.7/release/source"]))
 
 (declare-native
   :name "libmpsse"
