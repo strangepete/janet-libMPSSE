@@ -1,47 +1,19 @@
 # libMPSSE i2c/spi Janet binding
 
-[Janet language](https://janet-lang.org) bindings to [FTDI's libMPSSE library](https://ftdichip.com/software-examples/mpsse-projects/) for I2C and Serial communications.
-
-The Multi-Protocol Synchronous Serial Engine (MPSSE) is a piece of hardware available in some FTDI chips and cables that allows for configurable serial communication with devices, such as I2C, SPI, and JTAG. The primary means of use are through the D2XX driver (available on FTDI's website.) Commands are sent to the MPSSE to execute, such as sending data, setting the clock, various protocol features, or setting GPIO lines. While the chip will also appear as a Virtual COM port, that feature is not used here.
+[Janet language](https://janet-lang.org) bindings to [FTDI's libMPSSE library](https://ftdichip.com/software-examples/mpsse-projects/) for I2C and Serial communications on Windows & Linux.
 
 LibMPSSE is a library written by FTDI to simplify I2C, SPI and JTAG development, as configuring the underlying MPSSE hardware is fairly complex. JTAG is not yet implemented here.
 
-This module is an alpha-phase project written by a hobbyist -- all comments and nitpicks welcomed.
+The Multi-Protocol Synchronous Serial Engine (MPSSE) is a piece of hardware available in some FTDI chips and cables that allows for configurable serial communication with devices, such as I2C, SPI, and JTAG, through their D2XX driver. Commands are sent to the MPSSE to execute, such as sending data, setting the clock, protocol features, or setting GPIO lines. While the chip will also appear as a Virtual COM port, that feature is not used here.
+
+This module is an alpha-phase project written by a hobbyist -- all comments and nitpicks encouraged.
 
 API is documented in api.md and is in flux. Function naming and usage generally follows libMPSSE, though some changes were made for ergonomics, *e.g, `I2C_GetChannelInfo` -> `(i2c/info)`*
 
-## Installation
-
-This module has been primarily written and tested on Windows 10 x64. While it will compile on Linux, I don't have a bare-metal system to successfully test it on.
-
-####  Requirements:
-
-* [FTDI D2xx drivers.](https://ftdichip.com/drivers/d2xx-drivers/) Available for Win/Linux/Mac but commonly installed on Windows when connecting a usb cable 
-* [`jpm` Package manager](https://github.com/janet-lang/jpm)
-* [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/?q=build%20tools) for Windows
-
-Instructions for building `jpm` and Janet on Windows [can be found on the Janet Docs page](https://janet-lang.org/docs/index.html).
-
-libMPSSE can be installed via `jpm` in a Windows Native Tools Command Prompt:
-```
-jpm install https://github.com/strangepete/janet-libMPSSE.git
-```
-or built manually:
-```
-jpm build
-jpm test
-jpm install
-```
-
-
-Documentation can be generated using [documentarian](https://github.com/pyrmont/documentarian). 
-
-
 ## Usage
-
 > A demo driver for an MPU6050 gyro is in the `/examples` folder
 
-The module import is:
+The module can be imported in a script or the REPL:
 ```janet
 (use libmpsse)
 ```
@@ -86,11 +58,67 @@ The various transfer and config options are lightly documented in [api-i2c.md](a
 
 > The `/read` and `/write` functions are **blocking**, and `/channels` and `/info` are **not thread-safe**
 
+## Installation
+This module has been primarily written and tested on Windows 10 x64, and lighly tested on Debian 12.11/Proxmox VM with usb passthru.
+
+Documentation is generated using [documentarian](https://github.com/pyrmont/documentarian). 
+
+####  Requirements:
+* [FTDI D2xx drivers.](https://ftdichip.com/drivers/d2xx-drivers/) Available for Win/Linux/Mac but commonly installed on Windows when connecting a usb cable 
+* [`jpm` Package manager](https://github.com/janet-lang/jpm)
+* [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/?q=build%20tools) for Windows
+* or `build-essential` tools for Linux
+
+### Windows
+Instructions for building `jpm` and Janet on Windows [can be found on the Janet Docs page](https://janet-lang.org/docs/index.html).
+
+libMPSSE can be installed via `jpm` in a Windows Native Tools Command Prompt:
+```sh
+jpm install https://github.com/strangepete/janet-libMPSSE.git
+```
+or built manually:
+```sh
+jpm build
+jpm test
+jpm install
+```
+
+### Linux
+> The underlying d2xx library uses libusb and requires kernel level access to the device, which means any use of the library, including `jpm test` needs to be run with `sudo` or as root. There are work-arounds but they are beyond the scope of this document.
+
+Build with `jpm` as shown above, then install the D2XX linux driver as root or using sudo:
+```sh
+# FOLLOW THE README
+cp libftd2xx.* /usr/local/lib
+chmod 0755 /usr/local/lib/libftd2xx.*
+ln -sf /usr/local/lib/libftd2xx.so.1.4.33 /usr/local/lib/libftd2xx.so
+
+cp ftd2xx.h /usr/local/include
+cp WinTypes.h /usr/local/include
+
+ldconfig -v
+```
+
+On many distributions, an `ftdi_sio` module is enabled (responsible for creating a serial device) but prevents d2xx use and must be disabled:
+```sh
+# Check if enabled
+sudo lsmod | grep ftdi_sio
+
+# Unload temporarily
+# The readme demonstrates alternate options to disable permanently 
+sudo rmmod ftdi_sio
+sudo rmmod usbserial
+```
+
 ## Notes
 
 * libMPSSE can **_only operate as an I2C/SPI bus master_**. Many GPS devices also talk as master, and as such cannot be used to get nema messages :(
-* JTAG is planned but not yet implemented.
+* JTAG is planned but not yet implemented (which is actually a separate library despite the marketing)
 * On linux, [libftdi](https://www.intra2net.com/en/developer/libftdi/) ***is not*** d2xx; I think it would be worth targeting next, being open source and easily cross-platform.
+
+## Known issues
+
+* Underlying libusb or USB device presence/permission issues *may* show as functions returning `FT_OTHER_ERROR`
 
 ## Tested Devices
 
