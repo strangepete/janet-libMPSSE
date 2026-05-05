@@ -1,8 +1,6 @@
 (use /build/libmpsse)
 
-(let [ver (ft/version)
-      l (ver 0)
-      d (ver 1)]
+(let [[l d] (ft/version)]
       (printf "libMPSSE Version: %d.%d.%d" ;l)
       (printf "ftd2xx Version: %d.%d.%d\n" ;d))
 (assert (= :ok (i2c/err)) (i2c/err))
