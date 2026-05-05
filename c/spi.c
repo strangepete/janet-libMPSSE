@@ -38,7 +38,7 @@ static const JanetAbstractType channel_type = {
 /* C Functions */
 /***************/
 
-// Save the FT return status to dyn :spi-err, and return the value directly.
+// Save the FT return status to dyn :ft-err, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
     janet_setdyn("ft-err", janet_ckeywordv(ft_status_string[status]));
     return value;
@@ -399,9 +399,9 @@ JANET_FN(cfun_spi_initchannel,
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     
-    uint32_t clock = janet_getuinteger(argv, 2);
+    uint32_t clock = janet_getuinteger(argv, 1);
         if (clock > 30000000)
-            janet_panicf("clockrate %d is out of range. Expected 0 to 30,000,000 Hz");
+            janet_panicf("clockrate %d is out of range. Expected 0 to 30,000,000 Hz", clock);
     
     c->config.ClockRate = clock;
 
@@ -470,9 +470,9 @@ JANET_FN(cfun_spi_devicewrite,
     "This is a **blocking function**.") {
     janet_fixarity(argc, 3);
 
-    uint32_t size = janet_getinteger(argv, 1);
-    if (size <= 0)
-        janet_panicf("buffer size %d is out of range. Expected > 0", size);
+    uint32_t size = janet_getuinteger(argv, 1);
+    if (size == 0)
+        janet_panicf("buffer size out of range. Expected > 0");
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
@@ -612,14 +612,10 @@ static int channel_get(void *p, Janet key, Janet *out) {
 static int channel_gc(void *p, size_t s) {
     (void) s;
     channel_t *c = (channel_t *)p;
-    FT_STATUS status = FT_DEVICE_NOT_OPENED;
-    if (c != NULL) {
-        if (c->handle != NULL) {
-            status = SPI_CloseChannel(c->handle);
-            c->handle = NULL;
-        }
+    if (c->handle != NULL) {
+        SPI_CloseChannel(c->handle);
+        c->handle = NULL;
     }
-    set_status_dyn(status, janet_wrap_nil());
     return 0;
 }
 

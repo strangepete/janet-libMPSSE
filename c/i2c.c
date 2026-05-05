@@ -38,7 +38,7 @@ static const JanetAbstractType channel_type = {
 /* C Functions */
 /***************/
 
-// Save the FT return status to dyn :i2c-err, and return the value directly.
+// Save the FT return status to dyn :ft-err, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
     janet_setdyn("ft-err", janet_ckeywordv(ft_status_string[status]));
     return value;
@@ -381,7 +381,7 @@ JANET_FN(cfun_i2c_set_config_options,
             JanetKeyword opt = janet_unwrap_keyword(argv[i]);
             if (strcmp(opt, "disable-3phase-clocking") == 0)
                 options |= I2C_DISABLE_3PHASE_CLOCKING;
-            else if (strcmp(opt, "enable-drive-only") == 0)
+            else if (strcmp(opt, "enable-drive-only-zero") == 0)
                 options |= I2C_ENABLE_DRIVE_ONLY_ZERO;
             else
                 janet_panicf("invalid I2C config option %p, in slot #%d", argv[i], i+1);
@@ -419,9 +419,9 @@ JANET_FN(cfun_i2c_initchannel,
         else if (strcmp(clock, "high-speed") == 0)
             rate = I2C_CLOCK_HIGH_SPEED_MODE;
     } else if (janet_checktype(argv[1], JANET_NUMBER)) {
-        rate = janet_getuinteger(argv, 2);
+        rate = janet_getuinteger(argv, 1);
         if (rate > 3400000)
-            janet_panicf("clock rate %d is out of range. Expected 0 to 3,400,000");
+            janet_panicf("clock rate %d is out of range. Expected 0 to 3,400,000", rate);
     }
     c->config.ClockRate = rate;
 
@@ -531,13 +531,13 @@ JANET_FN(cfun_i2c_devicewrite,
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
 
-    uint32_t address = janet_getinteger(argv, 1);
+    uint32_t address = janet_getuinteger(argv, 1);
     if (address > 127)
         janet_panicf("i2c address %d is out of range. Expected <= 127.", address);
 
-    uint32_t size = janet_getinteger(argv, 2);
-    if (size <= 0)
-        janet_panicf("buffer size %d is out of range. Expected > 0", size);
+    uint32_t size = janet_getuinteger(argv, 2);
+    if (size == 0)
+        janet_panicf("buffer size out of range. Expected > 0");
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
@@ -614,14 +614,10 @@ static int channel_get(void *p, Janet key, Janet *out) {
 static int channel_gc(void *p, size_t s) {
     (void) s;
     channel_t *c = (channel_t *)p;
-    FT_STATUS status = FT_DEVICE_NOT_OPENED;
-    if (c != NULL) {
-        if (c->handle != NULL) {
-            status = I2C_CloseChannel(c->handle);
-            c->handle = NULL;
-        }
+    if (c->handle != NULL) {
+        I2C_CloseChannel(c->handle);
+        c->handle = NULL;
     }
-    set_status_dyn(status, janet_wrap_nil());
     return 0;
 }
 
