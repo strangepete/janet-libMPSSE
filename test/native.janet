@@ -1,4 +1,4 @@
-(use /build/libmpsse)
+(use ../libmpsse)
 
 (let [[l d] (ft/version)]
       (printf "libMPSSE Version: %d.%d.%d" ;l)

@@ -25,8 +25,12 @@
                "-IFTDI_LibMPSSE/release/libftd2xx"
                "-IFTDI_LibMPSSE/release/source"]))
 
+(declare-source
+  :source ["libmpsse/"])
+
 (declare-native
-  :name "libmpsse"
+  :name "_libmpsse"
+  :prefix "libmpsse"
   :cflags cflags
   :source @["FTDI_LibMPSSE/release/source/ftdi_mid.c"
             "FTDI_LibMPSSE/release/source/ftdi_infra.c"
