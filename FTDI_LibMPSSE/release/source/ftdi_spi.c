@@ -614,7 +614,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 	UCHAR mode;
 	UCHAR bitsToTransfer = 0;
 	DWORD noOfBytesTransferred = 0;
-	UCHAR cmdBuffer[10];
+	UCHAR cmdBuffer[4];
 	FN_ENTER;
 
 #ifdef ENABLE_PARAMETER_CHECKING
@@ -623,6 +623,12 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 	CHECK_NULL_RET(outBuffer);
 	CHECK_NULL_RET(sizeTransferred);
 #endif
+
+	if(sizeToTransfer == 0)
+	{
+		DBG(MSG_ERR,"invalid Transfer size(%d)\n",sizeToTransfer);
+		return FT_INVALID_PARAMETER;
+	}
 
 	LOCK_CHANNEL(handle);
 	status = SPI_GetChannelConfig(handle, &config);
@@ -671,7 +677,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 			cmdBuffer[2] = outBuffer[(*sizeTransferred+1)/8];
 
 			/*Write command and data*/
-			status = FT_Channel_Write(SPI, handle, 3, cmdBuffer,\
+			status = FT_Channel_Write(SPI, handle, sizeof(cmdBuffer), cmdBuffer,\
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			if (3 > noOfBytesTransferred)
@@ -739,7 +745,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 //			memcpy(&cmdBuffer[3],outBuffer, CurrentXferSize);
 			
 			/*Write command*/					
-			status = FT_Channel_Write(SPI, handle, 3,cmdBuffer,
+			status = FT_Channel_Write(SPI, handle, sizeof(cmdBuffer),cmdBuffer,
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			noOfBytesTransferred = 0;
@@ -1209,6 +1215,7 @@ static FT_STATUS SPI_DisplayList(void)
 			printf("\ttempNode->config->ClockRate=%u\n",
 				(unsigned)tempNode->config.ClockRate);
 		}
+		status = FT_OK;
 	}
 	printf("------------------------------------------------------\n");
 	FN_EXIT;

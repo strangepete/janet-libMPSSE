@@ -261,8 +261,8 @@ FTDIMPSSE_API FT_STATUS I2C_GetNumChannels(DWORD *numChannels);
 /*!
  * \brief Provides information about channel
  *
- * This function takes a channel index (valid values are from 1 to the value returned by
- * I2C_GetNumChannels) and provides information about the channel in the form of a populated
+ * This function takes a channel index (valid values are from 0 to the value returned by
+ * I2C_GetNumChannels -1) and provides information about the channel in the form of a populated
  * ChannelInfo structure.
  *
  * \param[in] index Index of the channel

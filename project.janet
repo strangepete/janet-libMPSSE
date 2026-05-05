@@ -5,20 +5,20 @@
   :author "Peter Rippe"
   :license "MIT"
   :url "https://github.com/strangepete/janet-libMPSSE"
-  :version "0.0.3")
+  :version "0.0.4")
 
 (def cflags (case (os/which)
               :windows [;default-cflags
                       # "/DINFRA_DEBUG_ENABLE" # libmpsse offers *verbose* debugging
                         "/DUNICODE"
                         "/D_UNICODE"
-                        "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=7" # libMPSSE version
+                        "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=8" # libMPSSE version
                         "/DFTDIMPSSE_STATIC"
                         "/IFTDI_LibMPSSE/release/include"
                         "/IFTDI_LibMPSSE/release/libftd2xx"]
               [;default-cflags
              # "-DINFRA_DEBUG_ENABLE"
-               "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=7"
+               "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=8"
                "-DFTDIMPSSE_STATIC"
                "-D_DEFAULT_SOURCE" # needed for usleep()
                "-IFTDI_LibMPSSE/release/include"

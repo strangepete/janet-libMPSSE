@@ -4,10 +4,24 @@ Limitations
 1) The APIs I2C_GetNumChannels, I2C_GetChannelInfo and I2C_OpenChannel do not work when they are called simultaneously from multiple applications at the same time.
 2) LatencyTimer should be greater than 0 for FT232H
 
+1.0.8
+	July 2025
+	1. Resolved the issue with I2C_GetChannelInfo and I2C_OpenChannel (Bug ID: 470).
+		- Updated the version number in ftdi_common.h.
+	2. Updated the Apple Keychain certificate key used for code signing in the jenkins-mac.sh build script.
+	3. Added size validation check in the SPI_ReadWrite API.
+
 1.0.7
 	August 2024
 	1. Applied a fix for the slow performance of I2C_DeviceRead/I2C_DeviceWrite with FAST_TRANSFER_BITS; it is now operating much faster.
 	2. While enabling the DEBUG flag, the 'conflicting types for I2C_DisplayList' issue was encountered and subsequently fixed.
+	3. Updated the macOS script file to create proper packages consistent with Linux, and revised the README file and Makefiles.
+	4. Added `-rpath,/usr/local/lib` to the Makefile, enabling the application to automatically search `/usr/local/lib` for `libmpsse.dylib` and `libftd2xx.dylib` at runtime.
+		– Updated the script and ReadMe files.
+		– Added `copyLib.sh`, a script to copy the MPSSE libraries into all sample directories.
+		– Added `install_libmpsse.sh`, a script to automate the installation process.
+
+
 
 1.0.6
 	July 2024

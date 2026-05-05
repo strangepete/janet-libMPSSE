@@ -387,11 +387,26 @@ FTDIMPSSE_API FT_STATUS I2C_GetChannelInfo(DWORD index,
 					FT_DEVICE_LIST_INFO_NODE *chanInfo)
 {
 	FT_STATUS status;
+	DWORD numChannels = 0;
 	
 	FN_ENTER;
 #ifdef ENABLE_PARAMETER_CHECKING
 	CHECK_NULL_RET(chanInfo);
 #endif // ENABLE_PARAMETER_CHECKING
+
+	status = FT_GetNumChannels(I2C, &numChannels);
+    if (status != FT_OK)
+        return status;
+
+    // Reject invalid index including effects of -1 → 0xFFFFFFFF
+    if (index >= numChannels)
+    {
+        printf("I2C_GetChannelInfo: invalid index %lu (valid range: 0 to %lu)\n", 
+               (unsigned long)index, (unsigned long)(numChannels - 1));
+        DBG(MSG_ERR, "Index out of range\n");
+        return FT_INVALID_PARAMETER;
+    }
+
 	// Channel start with 1 (index start with 0) channel = index+1
 	status = FT_GetChannelInfo(I2C, index+1, chanInfo);
 	CHECK_STATUS(status);
@@ -402,11 +417,26 @@ FTDIMPSSE_API FT_STATUS I2C_GetChannelInfo(DWORD index,
 FTDIMPSSE_API FT_STATUS I2C_OpenChannel(DWORD index, FT_HANDLE *handle)
 {
 	FT_STATUS status;
+	DWORD numChannels = 0;
 
 	FN_ENTER;
 #ifdef ENABLE_PARAMETER_CHECKING
 	CHECK_NULL_RET(handle);
 #endif // ENABLE_PARAMETER_CHECKING
+
+	status = FT_GetNumChannels(I2C, &numChannels);
+    if (status != FT_OK)
+        return status;
+
+    // Reject invalid index including effects of -1 → 0xFFFFFFFF
+    if (index >= numChannels)
+    {
+        printf("I2C_GetChannelInfo: invalid index %lu (valid range: 0 to %lu)\n", 
+               (unsigned long)index, (unsigned long)(numChannels - 1));
+        DBG(MSG_ERR, "Index out of range\n");
+        return FT_INVALID_PARAMETER;
+    }
+
 	/* Opens a channel and returns the pointer to its handle */
 	status = FT_OpenChannel(I2C, index+1, handle);
 	DBG(MSG_DEBUG,"index=%u handle=%u\n",(unsigned)index,(unsigned)*handle);
