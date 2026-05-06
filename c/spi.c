@@ -151,7 +151,7 @@ JANET_FN(cfun_spi_openchannel,
         return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
     
     channel_t *c = (channel_t *)janet_abstract(&channel_type, sizeof(channel_t));
-    memset(&c->config, 0x0, sizeof(ChannelConfig));
+    memset(c, 0x0, sizeof(channel_t));
     c->index = index;
 
     FT_STATUS status = SPI_OpenChannel((index - 1), &c->handle);
@@ -220,7 +220,7 @@ JANET_FN(cfun_spi_find,
         case KW_LOCID:
         case KW_TYPE:
             if (janet_checktype(argv[1], JANET_NUMBER))
-                id = janet_getinteger(argv, 1);
+                id = janet_getuinteger(argv, 1);
             else
                 janet_panicf("expected integer value, got %t", argv[1]);
             break;
@@ -277,7 +277,7 @@ JANET_FN(cfun_spi_is_open,
     if (janet_checktype(argv[0], JANET_ABSTRACT)) {
         channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
         if (NULL == c->handle)
-            return janet_wrap_boolean(FALSE);
+            return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
         index = c->index;
     } // fall thru if we have a channel index
     
@@ -285,13 +285,13 @@ JANET_FN(cfun_spi_is_open,
         FT_DEVICE_LIST_INFO_NODE chaninfo;
         if (index == 0)
             if ((index = janet_getuinteger(argv, 0)) == 0)
-                return janet_wrap_boolean(FALSE);
+                return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
 
         FT_STATUS status = SPI_GetChannelInfo((index - 1), &chaninfo);
         if (status != FT_OK)
             return set_status_dyn(status, janet_wrap_boolean(FALSE));
 
-        return set_status_dyn(status, janet_wrap_boolean((chaninfo.Flags & FT_FLAGS_OPENED) ? TRUE : FALSE));
+        return set_status_dyn(status, janet_wrap_boolean(chaninfo.Flags & FT_FLAGS_OPENED));
     }
     janet_panicf("invalid type %t, expected <spi/channel> or index.", argv[0]);
 }
@@ -344,7 +344,7 @@ JANET_FN(cfun_spi_set_config_options,
     "* `:mode1`             - captured on Falling, propagated on rising edge\n"
     "* `:mode2`             - captured on Falling, propagated on Rising edge\n"
     "* `:mode3`             - captured on Rising, propagated on Falling edge\n"
-    "* `:bus_`              - Use chip select bus line `:cs-bus3` to `7`\n"
+    "* `:bus_`              - Use chip select bus line `:bus3` to `7`\n"
     "* `:active-low`        - Set chip select line to Active Low (default is High)\n\n"
     "Note: Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel "
     "is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSE" 
@@ -389,13 +389,13 @@ JANET_FN(cfun_spi_set_config_options,
 
 JANET_FN(cfun_spi_initchannel,
     "(spi/init channel clockrate &opt latency)",
-    "Initialize an open `channel`, `clockrate` and optional`latency`. "
+    "Initialize an opened `channel`, `clockrate` and optional `latency`. "
     "Returns `true` if successful, or `false` on error. Sets :err to return status.\n\n"
     "* clockrate   - 0 to 30,000,000 Hz\n"
     "* latency     - 0 to 255 (default)\n\n"
     "Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, "
     "and Hi-speed devices (FT232H, FT2232H, FT4232H) is 1 to 255. Default is 255.") {
-    janet_arity(argc, 1, 3);
+    janet_arity(argc, 2, 3);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     
@@ -405,16 +405,16 @@ JANET_FN(cfun_spi_initchannel,
     
     c->config.ClockRate = clock;
 
-    uint8_t latency = janet_optinteger(argv, argc, 2, 255);
-    if (latency < 0 || latency > 255)
+    uint32_t latency = janet_optuinteger(argv, argc, 2, 255);
+    if (latency > 255)
         janet_panicf("latency %d out of range. expected 0 to 255", latency);
-    c->config.LatencyTimer = latency;
+    c->config.LatencyTimer = (uint8_t)latency;
 
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
 
     FT_STATUS status = SPI_InitChannel(c->handle, &c->config);
-    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK? TRUE : FALSE));
+    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
 }
 
 JANET_FN(cfun_spi_closechannel,
@@ -430,7 +430,7 @@ JANET_FN(cfun_spi_closechannel,
     FT_STATUS status = SPI_CloseChannel(c->handle);
     c->handle = NULL;
 
-    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK? TRUE : FALSE));
+    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
 }
 
 JANET_FN(cfun_spi_deviceread,
@@ -484,8 +484,10 @@ JANET_FN(cfun_spi_devicewrite,
     if (janet_checktype(argv[2], JANET_NUMBER)) {
         if (size > 1)
             janet_panicf("expected size == 1 when passed an integer, got %d", size);
-        uint8_t b = (uint8_t)janet_getuinteger(argv, 2);
-        buf = &b;
+        uint32_t b = janet_getuinteger(argv, 2);
+        if (b > 255)
+            janet_panicf("invalid integer length, expected value <= 255, got %d", b);
+        buf = (uint8_t*)&b;
     } else {
         JanetBuffer *buffer = janet_getbuffer(argv, 2);
         if (size > buffer->count)
@@ -513,11 +515,11 @@ JANET_FN(cfun_spi_readwrite,
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
     uint32_t size = janet_getuinteger(argv, 1);
-    if (size <= 0)
+    if (size == 0)
         janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
     JanetBuffer *sendbuf = janet_getbuffer(argv, 2);
-    if (size < sendbuf->count)
+    if (size > sendbuf->count)
         janet_panicf("write size %d larger than sendbuf size %d", size, sendbuf->count);
 
     JanetBuffer *recvbuf = janet_getbuffer(argv, 3);
@@ -543,7 +545,7 @@ JANET_FN(cfun_spi_is_busy,
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
     
     BOOL state = FALSE;
     FT_STATUS status = SPI_IsBusy(c->handle, &state);
@@ -559,14 +561,18 @@ JANET_FN(cfun_spi_gpio_write,
     "FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.") {
     janet_fixarity(argc, 3);
 
-    uint8_t dir = janet_getinteger(argv, 1);
-    uint8_t value = janet_getinteger(argv, 2);
+    uint32_t dir = janet_getuinteger(argv, 1);
+    uint32_t value = janet_getuinteger(argv, 2);
+    if (dir > 255)
+        janet_panic("value must be <= 255, in slot #1");
+    if (value > 255)
+        janet_panic("value must be <= 255, in slot #2");
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
-    FT_STATUS status = FT_WriteGPIO(c->handle, dir, value);
+    FT_STATUS status = FT_WriteGPIO(c->handle, (uint8_t)dir, (uint8_t)value);
     return set_status_dyn(status, janet_wrap_nil());
 }
 
@@ -621,7 +627,7 @@ static int channel_gc(void *p, size_t s) {
 
 static void channel_string(void *p, JanetBuffer *buffer) {
     channel_t *c = (channel_t *)p;
-    janet_formatb(buffer, "#%d 0x%X", c->index, c);
+    janet_formatb(buffer, "#%d 0x%X", c->index, (uint64_t)(uintptr_t)c);
 }
 
 void spi_register(JanetTable *env) {

@@ -151,7 +151,7 @@ JANET_FN(cfun_i2c_openchannel,
         return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
     
     channel_t *c = (channel_t *)janet_abstract(&channel_type, sizeof(channel_t));
-    memset(&c->config, 0x0, sizeof(ChannelConfig));
+    memset(c, 0x0, sizeof(channel_t));
     c->index = index;
 
     FT_STATUS status = I2C_OpenChannel((index - 1), &c->handle);
@@ -223,7 +223,7 @@ JANET_FN(cfun_i2c_find,
         case KW_LOCID:
         case KW_TYPE:
             if (janet_checktype(argv[1], JANET_NUMBER))
-                id = janet_getinteger(argv, 1);
+                id = janet_getuinteger(argv, 1);
             else
                 janet_panicf("expected integer value, got %t", argv[1]);
             break;
@@ -280,7 +280,7 @@ JANET_FN(cfun_i2c_is_open,
     if (janet_checktype(argv[0], JANET_ABSTRACT)) {
         channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
         if (NULL == c->handle)
-            return janet_wrap_boolean(FALSE);
+            return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
         index = c->index;
     } // fall thru if we have a channel index
 
@@ -288,13 +288,13 @@ JANET_FN(cfun_i2c_is_open,
         FT_DEVICE_LIST_INFO_NODE chaninfo;
         if (index == 0)
             if ((index = janet_getuinteger(argv, 0)) == 0)
-                return janet_wrap_boolean(FALSE);
+                return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
 
         FT_STATUS status = I2C_GetChannelInfo((index - 1), &chaninfo);
         if (status != FT_OK)
             return set_status_dyn(status, janet_wrap_boolean(FALSE));
 
-        return set_status_dyn(status, janet_wrap_boolean((chaninfo.Flags & FT_FLAGS_OPENED) ? TRUE : FALSE));
+        return set_status_dyn(status, janet_wrap_boolean(chaninfo.Flags & FT_FLAGS_OPENED));
     }
     janet_panicf("invalid type %t, expected <i2c/channel> or index.", argv[0]);
 }
@@ -410,31 +410,38 @@ JANET_FN(cfun_i2c_initchannel,
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     
     I2C_CLOCKRATE rate = I2C_CLOCK_STANDARD_MODE;
-    if (janet_checktype(argv[1], JANET_KEYWORD)) {
-        JanetKeyword clock = janet_optkeyword(argv, argc, 1, janet_cstring("standard"));
-        if (strcmp(clock, "fast") == 0)
-            rate = I2C_CLOCK_FAST_MODE;
-        else if (strcmp(clock, "fast-plus") == 0)
-            rate = I2C_CLOCK_FAST_MODE_PLUS;
-        else if (strcmp(clock, "high-speed") == 0)
-            rate = I2C_CLOCK_HIGH_SPEED_MODE;
-    } else if (janet_checktype(argv[1], JANET_NUMBER)) {
-        rate = janet_getuinteger(argv, 1);
-        if (rate > 3400000)
-            janet_panicf("clock rate %d is out of range. Expected 0 to 3,400,000", rate);
+    if (argc > 1) {
+        if (janet_checktype(argv[1], JANET_KEYWORD)) {
+            JanetKeyword clock = janet_getkeyword(argv, 1);
+            if (strcmp(clock, "standard") == 0)
+                rate = I2C_CLOCK_STANDARD_MODE;
+            else if (strcmp(clock, "fast") == 0)
+                rate = I2C_CLOCK_FAST_MODE;
+            else if (strcmp(clock, "fast-plus") == 0)
+                rate = I2C_CLOCK_FAST_MODE_PLUS;
+            else if (strcmp(clock, "high-speed") == 0)
+                rate = I2C_CLOCK_HIGH_SPEED_MODE;
+            else
+                janet_panicf("invalid clock rate keyword %p", argv[1]);
+        } else if (janet_checktype(argv[1], JANET_NUMBER)) {
+            rate = janet_getuinteger(argv, 1);
+            if (rate > 3400000)
+                janet_panicf("clock rate %d is out of range. Expected 0 to 3,400,000", rate);
+        } else
+            janet_panicf("invalid clock rate option, expected number or keyword but got %t", argv[1]);
     }
     c->config.ClockRate = rate;
 
-    uint8_t latency = janet_optinteger(argv, argc, 2, 255);
-    if (latency < 1 || latency > 255)
+    uint32_t latency = janet_optuinteger(argv, argc, 2, 255);
+    if (latency > 255)
         janet_panicf("latency %d out of range. expected 1 to 255", latency);
-    c->config.LatencyTimer = latency;
+    c->config.LatencyTimer = (uint8_t)latency;
 
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
 
     FT_STATUS status = I2C_InitChannel(c->handle, &c->config);
-    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK? TRUE : FALSE));
+    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
 }
 
 JANET_FN(cfun_i2c_closechannel,
@@ -462,14 +469,18 @@ JANET_FN(cfun_ft_gpio_write,
     "FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.") {
     janet_fixarity(argc, 3);
 
-    uint8_t dir = janet_getinteger(argv, 1);
-    uint8_t value = janet_getinteger(argv, 2);
+    uint32_t dir = janet_getuinteger(argv, 1);
+    uint32_t value = janet_getuinteger(argv, 2);
+    if (dir > 255)
+        janet_panic("value must be <= 255, in slot #1");
+    if (value > 255)
+        janet_panic("value must be <= 255, in slot #2");
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
-    FT_STATUS status = FT_WriteGPIO(c->handle, dir, value);
+    FT_STATUS status = FT_WriteGPIO(c->handle, (uint8_t)dir, (uint8_t)value);
     return set_status_dyn(status, janet_wrap_nil());
 }
 
@@ -549,8 +560,10 @@ JANET_FN(cfun_i2c_devicewrite,
     if (janet_checktype(argv[3], JANET_NUMBER)) {
         if (size > 1)
             janet_panicf("expected size == 1 when passed an integer, got %d", size);
-        uint8_t b = (uint8_t)janet_getuinteger(argv, 3);
-        buf = &b;
+        uint32_t b = janet_getuinteger(argv, 3);
+        if (b > 255)
+            janet_panicf("invalid integer length, expected value <= 255, got %d", b);
+        buf = (uint8_t*)&b;
     } else {
         JanetBuffer *buffer = janet_getbuffer(argv, 3);
         if (size > buffer->count)
@@ -623,7 +636,7 @@ static int channel_gc(void *p, size_t s) {
 
 static void channel_string(void *p, JanetBuffer *buffer) {
     channel_t *c = (channel_t *)p;
-    janet_formatb(buffer, "#%d 0x%X", c->index, c);
+    janet_formatb(buffer, "#%d 0x%X", c->index, (uint64_t)(uintptr_t)c);
 }
 
 void i2c_register(JanetTable *env) {
