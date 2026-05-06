@@ -10,7 +10,7 @@
 # Wait until cable is connected or channel available.
 (prin "Connecting...")
 (while (not (mpu/init))
-  (prin ".")
+  (prin ".")(flush)
   (os/sleep 1))
 (print "")
 
@@ -19,7 +19,7 @@
 (prin "Waiting for device response from 0x68...")
 (var me nil)
 (while (nil? (set me (mpu/who-am-i)))
-  (prin ".")
+  (prin ".")(flush)
   (os/sleep 1))
 (print "")
 
@@ -43,7 +43,7 @@
 (repeat 100
         (each x (mpu/get-gyro)
           (prinf "%3.2f\t" x))
-        (print "")
+        (print "")(flush)
         (os/sleep 0.2))
 
 (mpu/sleep)
