@@ -25,7 +25,7 @@
         [state]
         (def pin {:on 0x00    # all low
                   :off 0x40  # ACBUS6, bit 7: high
-                  :dir 0xff}) # direction: out
+                  :dir 0x7f}) # direction: all out except ACBUS7(VBUSDTCT) input
         (i2c/gpio-write chan
                         (pin :dir)
                         (if state (pin :on) (pin :off)))
@@ -37,6 +37,6 @@
               (LED (toggle state))
               (prinf "%s " (if state "on" "off"))
               (flush)
-              (os/sleep 1))
+              (ev/sleep 0.5))
 
       (LED false))
