@@ -527,8 +527,8 @@ JANET_FN(cfun_spi_readwrite,
 
     uint32_t transfer_sz = 0;
     FT_STATUS status = SPI_ReadWrite(c->handle,
-                                    sendbuf->data,
                                     (recvbuf->data + recvbuf->count),
+                                    sendbuf->data,
                                     size, 
                                     &transfer_sz,
                                     c->write_options);
