@@ -1,5 +1,6 @@
 #ifndef _MODULE_H_
 #define _MODULE_H_
+#include <inttypes.h>
 #include <janet.h>
 #include "../FTDI_LibMPSSE/release/libftd2xx/ftd2xx.h"
 

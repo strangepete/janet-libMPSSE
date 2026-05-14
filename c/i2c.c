@@ -408,7 +408,9 @@ JANET_FN(cfun_i2c_initchannel,
     janet_arity(argc, 1, 3);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
+
     I2C_CLOCKRATE rate = I2C_CLOCK_STANDARD_MODE;
     if (argc > 1) {
         if (janet_checktype(argv[1], JANET_KEYWORD)) {
@@ -434,11 +436,8 @@ JANET_FN(cfun_i2c_initchannel,
 
     uint32_t latency = janet_optuinteger(argv, argc, 2, 255);
     if (latency > 255)
-        janet_panicf("latency %d out of range. expected 1 to 255", latency);
+        janet_panicf("latency %d out of range. expected 0 to 255", latency);
     c->config.LatencyTimer = (uint8_t)latency;
-
-    if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
 
     FT_STATUS status = I2C_InitChannel(c->handle, &c->config);
     return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
@@ -506,6 +505,10 @@ JANET_FN(cfun_i2c_deviceread,
     "Returns bytes read. Sets `:err` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
+    
+    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
     uint32_t address = janet_getuinteger(argv, 1);
     if (address > 127)
@@ -517,10 +520,6 @@ JANET_FN(cfun_i2c_deviceread,
 
     JanetBuffer *buffer = janet_getbuffer(argv, 3);
     janet_buffer_extra(buffer, size);
-    
-    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
     uint32_t readsz = 0;
     FT_STATUS status = I2C_DeviceRead(c->handle,
@@ -557,18 +556,28 @@ JANET_FN(cfun_i2c_devicewrite,
     FT_STATUS status;
     uint32_t writesz = 0;
     uint8_t *buf = NULL;
+    uint8_t b8;
     if (janet_checktype(argv[3], JANET_NUMBER)) {
         if (size > 1)
             janet_panicf("expected size == 1 when passed an integer, got %d", size);
         uint32_t b = janet_getuinteger(argv, 3);
         if (b > 255)
             janet_panicf("invalid integer length, expected value <= 255, got %d", b);
-        buf = (uint8_t*)&b;
+        b8 = (uint8_t)b;
+        buf = &b8;
     } else {
-        JanetBuffer *buffer = janet_getbuffer(argv, 3);
-        if (size > buffer->count)
-            janet_panicf("write size %d larger than buffer count %d", size, buffer->count);
-        buf = buffer->data;
+        if (janet_checktype(argv[3], JANET_STRING)) {
+            JanetString s = janet_getstring(argv, 3);
+            size_t len = janet_string_length(s);
+            if (size > len)
+                janet_panicf("write size %d larger than string size %d", size, len);
+            buf = (uint8_t *)s;
+        } else {
+            JanetBuffer *buffer = janet_getbuffer(argv, 3);
+            if (size > buffer->count)
+                janet_panicf("write size %d larger than buffer count %d", size, buffer->count);
+            buf = buffer->data;
+        }
     }
     status = I2C_DeviceWrite(c->handle, 
                              address,
@@ -636,7 +645,10 @@ static int channel_gc(void *p, size_t s) {
 
 static void channel_string(void *p, JanetBuffer *buffer) {
     channel_t *c = (channel_t *)p;
-    janet_formatb(buffer, "#%d 0x%X", c->index, (uint64_t)(uintptr_t)c);
+    char buf[16 + 6 + 1] = {0}; /* 16 hex + 6 (#99_0x) + null */
+    snprintf(buf, sizeof(buf), "#%d 0x%" PRIXPTR, c->index, (uintptr_t)c);
+    size_t len = strnlen(buf, sizeof(buf));
+    janet_buffer_push_bytes(buffer, buf, len);
 }
 
 void i2c_register(JanetTable *env) {
