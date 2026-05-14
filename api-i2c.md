@@ -13,7 +13,8 @@
 
 Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]
 
-[1]: c/i2c.c#L580
+[1]: c/i2c.c#L602
+
 
 ## i2c/channels
 
@@ -31,6 +32,7 @@ This function is **not thread-safe**.
 
 [2]: c/i2c.c#L82
 
+
 ## i2c/close
 
 **cfunction**  | [source][3]
@@ -41,7 +43,8 @@ This function is **not thread-safe**.
 
 Closes the specified channel. Returns `true` if successful. Sets `:err` to return status.
 
-[3]: c/i2c.c#L443
+[3]: c/i2c.c#L449
+
 
 ## i2c/config
 
@@ -59,6 +62,7 @@ Set channel config options. Takes zero, or more keywords:
 Note: 3-phase clocking only available on hi-speed devices, not the FT2232D. Drive-only-zero is only available on the FT232H.
 
 [4]: c/i2c.c#L373
+
 
 ## i2c/err
 
@@ -96,6 +100,7 @@ Note: currently a wrapper for (dyn :ft-err)
 
 [5]: c/i2c.c#L72
 
+
 ## i2c/find-by
 
 **cfunction**  | [source][6]
@@ -115,6 +120,7 @@ Returns a channel `index` or `nil` on failure. Sets `:err` to return status.
 
 [6]: c/i2c.c#L190
 
+
 ## i2c/gpio-read
 
 **cfunction**  | [source][7]
@@ -129,7 +135,8 @@ Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return stat
 
 Note: **Must call write-gpio to initialize before reading**. See the libMPSSE.
 
-[7]: c/i2c.c#L480
+[7]: c/i2c.c#L490
+
 
 ## i2c/gpio-write
 
@@ -145,7 +152,8 @@ Returns `nil`. Sets `:err` to return status.
 
 Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.
 
-[8]: c/i2c.c#L462
+[8]: c/i2c.c#L468
+
 
 ## i2c/id
 
@@ -158,6 +166,7 @@ Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in
 Takes an `<i2c/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.
 
 [9]: c/i2c.c#L136
+
 
 ## i2c/info
 
@@ -183,6 +192,7 @@ This function is **not thread-safe**.
 
 [10]: c/i2c.c#L103
 
+
 ## i2c/init
 
 **cfunction**  | [source][11]
@@ -205,6 +215,7 @@ Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, and Hi-sp
 
 [11]: c/i2c.c#L407
 
+
 ## i2c/is-open
 
 **cfunction**  | [source][12]
@@ -218,6 +229,7 @@ Returns true if a channel is open, or false if closed or invalid. Sets `:err` to
 Takes either an `<i2c/channel>` object, or 1-based `index`.
 
 [12]: c/i2c.c#L276
+
 
 ## i2c/open
 
@@ -235,6 +247,7 @@ Returns an `<i2c/channel>` if succesful, or `nil` on error. Sets `:err` to retur
 
 [13]: c/i2c.c#L146
 
+
 ## i2c/read
 
 **cfunction**  | [source][14]
@@ -249,7 +262,8 @@ Returns bytes read. Sets `:err` to return status.
 
 This is a **blocking function**.
 
-[14]: c/i2c.c#L496
+[14]: c/i2c.c#L506
+
 
 ## i2c/read-opt
 
@@ -272,6 +286,7 @@ Set I2C Read transfer options. Takes zero, or more keywords:
 
 [15]: c/i2c.c#L357
 
+
 ## i2c/write
 
 **cfunction**  | [source][16]
@@ -286,7 +301,8 @@ Returns bytes written. Sets `:err` to return status.
 
 This is a **blocking function**.
 
-[16]: c/i2c.c#L531
+[16]: c/i2c.c#L541
+
 
 ## i2c/write-opt
 

@@ -669,7 +669,8 @@ JANET_FN(cfun_spi_gpio_read,
 }
 
 JANET_FN(cfun_spi_loopback,
-    "(spi/loopback channel bool)", "") {
+    "(spi/loopback channel bool)",
+    "Enables the `channel`s internal loopback. Returns `nil`.") {
     janet_fixarity(argc, 2);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)

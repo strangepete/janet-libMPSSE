@@ -1,6 +1,6 @@
 # libmpsse SPI API
 
-[ft/version](#ftversion), [spi/channels](#spichannels), [spi/close](#spiclose), [spi/config](#spiconfig), [spi/err](#spierr), [spi/find-by](#spifind-by), [spi/gpio-read](#spigpio-read), [spi/gpio-write](#spigpio-write), [spi/id](#spiid), [spi/info](#spiinfo), [spi/init](#spiinit), [spi/is-busy](#spiis-busy), [spi/is-open](#spiis-open), [spi/open](#spiopen), [spi/read](#spiread), [spi/read-opt](#spiread-opt), [spi/readwrite](#spireadwrite), [spi/write](#spiwrite), [spi/write-opt](#spiwrite-opt)
+[ft/version](#ftversion), [spi/channels](#spichannels), [spi/close](#spiclose), [spi/config](#spiconfig), [spi/err](#spierr), [spi/find-by](#spifind-by), [spi/gpio-read](#spigpio-read), [spi/gpio-write](#spigpio-write), [spi/id](#spiid), [spi/info](#spiinfo), [spi/init](#spiinit), [spi/is-busy](#spiis-busy), [spi/is-open](#spiis-open), [spi/loopback](#spiloopback), [spi/open](#spiopen), [spi/pins](#spipins), [spi/read](#spiread), [spi/read-opt](#spiread-opt), [spi/readwrite](#spireadwrite), [spi/toggle-cs](#spitoggle-cs), [spi/write](#spiwrite), [spi/write-opt](#spiwrite-opt)
 
 ## ft/version
 
@@ -12,7 +12,8 @@
 
 Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]
 
-[1]: c/i2c.c#L580
+[1]: c/i2c.c#L602
+
 
 ## spi/channels
 
@@ -28,7 +29,8 @@ Note: The number of ports available in each chip is different, but must be an MP
 
 This function is **not thread-safe**.
 
-[18]: c/spi.c#L82
+[18]: c/spi.c#L84
+
 
 ## spi/close
 
@@ -40,7 +42,8 @@ This function is **not thread-safe**.
 
 Closes the specified channel. Returns `true` if successful. Sets `:err` to return status.
 
-[19]: c/spi.c#L423
+[19]: c/spi.c#L488
+
 
 ## spi/config
 
@@ -50,18 +53,24 @@ Closes the specified channel. Returns `true` if successful. Sets `:err` to retur
 (spi/config channel &opt kw ...)
 ```
 
-Set channel config options. Takes zero, or more keywords:
+Set channel config options. Takes one or more keywords:
 
-* `:mode0`             - captured on Rising, propagated on Falling edge
-* `:mode1`             - captured on Falling, propagated on rising edge
-* `:mode2`             - captured on Falling, propagated on Rising edge
-* `:mode3`             - captured on Rising, propagated on Falling edge
-* `:bus_`              - Use chip select bus line `:cs-bus3` to `7`
-* `:active-low`        - Set chip select line to Active Low (default is High)
+* `:mode0`             - CPOL=0 CPHA=0 (default)
+* `:mode1`             - CPOL=0 CPHA=1
+* `:mode2`             - CPOL=1 CPHA=0
+* `:mode3`             - CPOL=1 CPHA=1
+* `:bus_`              - Use chip select bus line `:bus3` to `7` (default :bus3)
+* `:active-low`        - Set chip select line to Active Low
+* `:active-high`       - Set chip select line to Active High (default)
 
-Note: Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSEchannel (i.e., if available in the chip) is used.
+Passing `nil` will reset to default; passing only the channel returns the config value
 
-[20]: c/spi.c#L351
+Note: 
+* Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSEchannel (i.e., if available in the chip) is used.
+* FT2xxH/FT2232D only support Modes 0 & 2
+
+[20]: c/spi.c#L358
+
 
 ## spi/err
 
@@ -97,7 +106,8 @@ The return status of the last executed SPI function as a keyword representing an
 
 Note: currently a wrapper for (dyn :ft-err)
 
-[21]: c/spi.c#L72
+[21]: c/spi.c#L74
+
 
 ## spi/find-by
 
@@ -116,7 +126,8 @@ Find a channel matching an explicit identifer. Takes a keyword and value:
 
 Returns a channel `index` or `nil` on failure. Sets `:err` to return status.
 
-[22]: c/spi.c#L187
+[22]: c/spi.c#L190
+
 
 ## spi/gpio-read
 
@@ -132,7 +143,8 @@ Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return stat
 
 Note: **Must call write-gpio to initialize before reading**. See the libMPSSE AN-178.
 
-[23]: c/spi.c#L577
+[23]: c/spi.c#L659
+
 
 ## spi/gpio-write
 
@@ -148,7 +160,8 @@ Returns `nil`. Sets `:err` to return status.
 
 Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.
 
-[24]: c/spi.c#L559
+[24]: c/spi.c#L637
+
 
 ## spi/id
 
@@ -160,7 +173,8 @@ Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in
 
 Takes an `<spi/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.
 
-[25]: c/spi.c#L136
+[25]: c/spi.c#L138
+
 
 ## spi/info
 
@@ -184,7 +198,8 @@ On success, returns a table:
 
 This function is **not thread-safe**.
 
-[26]: c/spi.c#L103
+[26]: c/spi.c#L105
+
 
 ## spi/init
 
@@ -194,14 +209,15 @@ This function is **not thread-safe**.
 (spi/init channel clockrate &opt latency)
 ```
 
-Initialize an open `channel`, `clockrate` and optional`latency`. Returns `true` if successful, or `false` on error. Sets :err to return status.
+Initialize an opened `channel`, `clockrate` and optional `latency`. Returns `true` if successful, or `false` on error. Sets :err to return status.
 
 * clockrate   - 0 to 30,000,000 Hz
 * latency     - 0 to 255 (default)
 
 Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, and Hi-speed devices (FT232H, FT2232H, FT4232H) is 1 to 255. Default is 255.
 
-[27]: c/spi.c#L397
+[27]: c/spi.c#L463
+
 
 ## spi/is-busy
 
@@ -215,7 +231,8 @@ Reads the state of the MISO line without clocking the SPI bus.
 
 Returns boolean state. Sets `:err` to return status.
 
-[28]: c/spi.c#L541
+[28]: c/spi.c#L619
+
 
 ## spi/is-open
 
@@ -229,11 +246,25 @@ Returns true if a channel is open, or false if closed or invalid. Sets `:err` to
 
 Takes either an `<spi/channel>` object, or 1-based `index`.
 
-[29]: c/spi.c#L273
+[29]: c/spi.c#L276
+
+
+## spi/loopback
+
+**cfunction**  | [source][30]
+
+```janet
+(spi/loopback channel bool)
+```
+
+Enables the `channel`s internal loopback.  Returns `nil`.
+
+[30]: c/spi.c#L672
+
 
 ## spi/open
 
-**cfunction**  | [source][30]
+**cfunction**  | [source][31]
 
 ```janet
 (spi/open index)
@@ -245,11 +276,31 @@ Returns an `<spi/channel>` if succesful, or `nil` on error. Sets `:err` to retur
 
 
 
-[30]: c/spi.c#L146
+[31]: c/spi.c#L148
+
+
+## spi/pins
+
+**cfunction**  | [source][32]
+
+```janet
+(spi/pins channel [init] [close])
+```
+
+Set the direction and values of the current channel on initialization or close.
+`init`, `close` are tuples of 8-bit `[direction value]` bytes.
+
+* direction:   output = 1, input = 0
+* value:       logic high = 1, low = 0
+
+Returns the computed 32-bit option value for testing.
+
+[32]: c/spi.c#L428
+
 
 ## spi/read
 
-**cfunction**  | [source][31]
+**cfunction**  | [source][33]
 
 ```janet
 (spi/read channel size buffer)
@@ -261,11 +312,12 @@ Returns bytes read. Sets `:err` to return status.
 
 This is a **blocking function**.
 
-[31]: c/spi.c#L440
+[33]: c/spi.c#L506
+
 
 ## spi/read-opt
 
-**cfunction**  | [source][32]
+**cfunction**  | [source][34]
 
 ```janet
 (spi/read-opt channel &opt kw ...)
@@ -278,11 +330,12 @@ Set SPI Read transfer options. Takes zero, or more keywords:
 
 
 
-[32]: c/spi.c#L332
+[34]: c/spi.c#L335
+
 
 ## spi/readwrite
 
-**cfunction**  | [source][33]
+**cfunction**  | [source][35]
 
 ```janet
 (spi/readwrite channel size sendbuf recvbuf)
@@ -296,11 +349,25 @@ Note: Uses the `write-opt` transfer option for both operations.
 
 This is a **blocking function**.
 
-[33]: c/spi.c#L508
+[35]: c/spi.c#L586
+
+
+## spi/toggle-cs
+
+**cfunction**  | [source][36]
+
+```janet
+(spi/toggle-cs channel bool)
+```
+
+Toggles the current chip select line on or off
+
+[36]: c/spi.c#L411
+
 
 ## spi/write
 
-**cfunction**  | [source][34]
+**cfunction**  | [source][37]
 
 ```janet
 (spi/write channel size buffer)
@@ -312,11 +379,12 @@ Returns bytes written. Sets `:err` to return status.
 
 This is a **blocking function**.
 
-[34]: c/spi.c#L470
+[37]: c/spi.c#L536
+
 
 ## spi/write-opt
 
-**cfunction**  | [source][35]
+**cfunction**  | [source][38]
 
 ```janet
 (spi/write-opt channel &opt kw ...)
@@ -329,4 +397,4 @@ Set SPI Write transfer options. Takes zero, or more keywords:
 
 
 
-[35]: c/spi.c#L320
+[38]: c/spi.c#L323
