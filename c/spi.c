@@ -3,7 +3,9 @@
 #include "module.h"
 #include "../FTDI_LibMPSSE/release/include/libmpsse_spi.h"
 
+
 typedef struct {
+    boolean         is_initialized;
     uint32_t        index;          // 1-based, as user-entered
     uint32_t        id;             // unique id per-channel set by libmpsse
     FT_HANDLE       handle;
@@ -152,8 +154,9 @@ JANET_FN(cfun_spi_openchannel,
     
     channel_t *c = (channel_t *)janet_abstract(&channel_type, sizeof(channel_t));
     memset(c, 0x0, sizeof(channel_t));
+    
+    c->is_initialized = FALSE;
     c->index = index;
-
     FT_STATUS status = SPI_OpenChannel((index - 1), &c->handle);
     if (status != FT_OK)
         return set_status_dyn(status, janet_wrap_nil());
@@ -339,52 +342,115 @@ JANET_FN(cfun_spi_set_read_options,
 
 JANET_FN(cfun_spi_set_config_options,
     "(spi/config channel &opt kw ...)",
-    "Set channel config options. Takes zero, or more keywords:\n\n"
-    "* `:mode0`             - captured on Rising, propagated on Falling edge\n"
-    "* `:mode1`             - captured on Falling, propagated on rising edge\n"
-    "* `:mode2`             - captured on Falling, propagated on Rising edge\n"
-    "* `:mode3`             - captured on Rising, propagated on Falling edge\n"
-    "* `:bus_`              - Use chip select bus line `:bus3` to `7`\n"
-    "* `:active-low`        - Set chip select line to Active Low (default is High)\n\n"
-    "Note: Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel "
+    "Set channel config options. Takes one or more keywords:\n\n"
+    "* `:mode0`             - CPOL=0 CPHA=0 (default)\n"
+    "* `:mode1`             - CPOL=0 CPHA=1\n"
+    "* `:mode2`             - CPOL=1 CPHA=0\n"
+    "* `:mode3`             - CPOL=1 CPHA=1\n"
+    "* `:bus_`              - Use chip select bus line `:bus3` to `7` (default :bus3)\n"
+    "* `:active-low`        - Set chip select line to Active Low\n"
+    "* `:active-high`       - Set chip select line to Active High (default)\n\n"
+    "Passing `nil` will reset to default; passing only the channel returns the config value\n\n"
+    "Note: \n"
+    "* Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel "
     "is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSE" 
-    "channel (i.e., if available in the chip) is used.") {
+    "channel (i.e., if available in the chip) is used.\n"
+    "* FT2xxH/FT2232D only support Modes 0 & 2") {
     janet_arity(argc, 1, 4);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-
-    uint32_t options = 0;
-    for (int i = 1; i < argc; i++) {
-        if (janet_checktype(argv[i], JANET_KEYWORD)) {
-            JanetKeyword opt = janet_unwrap_keyword(argv[i]);
-            if (strcmp(opt, "mode0") == 0)
-                options |= SPI_CONFIG_OPTION_MODE0;
-            else if (strcmp(opt, "mode1") == 0)
-                options |= SPI_CONFIG_OPTION_MODE1;
-            else if (strcmp(opt, "mode2") == 0)
-                options |= SPI_CONFIG_OPTION_MODE2;
-            else if (strcmp(opt, "mode3") == 0)
-                options |= SPI_CONFIG_OPTION_MODE3;
-            else if (strcmp(opt, "bus3") == 0)
-                options |= SPI_CONFIG_OPTION_CS_DBUS3;
-            else if (strcmp(opt, "bus4") == 0)
-                options |= SPI_CONFIG_OPTION_CS_DBUS4;
-            else if (strcmp(opt, "bus5") == 0)
-                options |= SPI_CONFIG_OPTION_CS_DBUS5;
-            else if (strcmp(opt, "bus6") == 0)
-                options |= SPI_CONFIG_OPTION_CS_DBUS6;
-            else if (strcmp(opt, "bus7") == 0)
-                options |= SPI_CONFIG_OPTION_CS_DBUS7;
-            else if (strcmp(opt, "active-low") == 0)
-                options |= SPI_CONFIG_OPTION_CS_ACTIVELOW;
-            else
-                janet_panicf("invalid SPI config option %p, in slot #%d", argv[i], i+1);
-        } else
-            janet_panicf("invalid SPI config option type, expected keyword but got %t in slot #%d", argv[i], i+1);
+    uint32_t options = c->config.configOptions;
+    
+    if (argc == 1) 
+        return set_status_dyn(FT_OK, janet_wrap_integer(options));        /* (spi/config chan) -> raw config value */
+    if (argc == 2 && janet_checktype(argv[1], JANET_NIL))
+        options = 0x00;                                     /* (spi/config chan nil) resets to defaults (mode0, bus3, active-high) */
+    else {
+        for (int i = 1; i < argc; i++) {
+            if (janet_checktype(argv[i], JANET_KEYWORD)) {
+                JanetKeyword opt = janet_unwrap_keyword(argv[i]);
+                if (strcmp(opt, "mode0") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_MODE_MASK) | SPI_CONFIG_OPTION_MODE0;
+                else if (strcmp(opt, "mode1") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_MODE_MASK) | SPI_CONFIG_OPTION_MODE1;
+                else if (strcmp(opt, "mode2") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_MODE_MASK) | SPI_CONFIG_OPTION_MODE2;
+                else if (strcmp(opt, "mode3") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_MODE_MASK) | SPI_CONFIG_OPTION_MODE3;
+                else if (strcmp(opt, "bus3") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_CS_MASK) | SPI_CONFIG_OPTION_CS_DBUS3;
+                else if (strcmp(opt, "bus4") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_CS_MASK) | SPI_CONFIG_OPTION_CS_DBUS4;
+                else if (strcmp(opt, "bus5") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_CS_MASK) | SPI_CONFIG_OPTION_CS_DBUS5;
+                else if (strcmp(opt, "bus6") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_CS_MASK) | SPI_CONFIG_OPTION_CS_DBUS6;
+                else if (strcmp(opt, "bus7") == 0)
+                    options = (options & ~SPI_CONFIG_OPTION_CS_MASK) | SPI_CONFIG_OPTION_CS_DBUS7;
+                else if (strcmp(opt, "active-low") == 0)
+                    options |= SPI_CONFIG_OPTION_CS_ACTIVELOW;
+                else if (strcmp(opt, "active-high") == 0)
+                    options &= ~SPI_CONFIG_OPTION_CS_ACTIVELOW; // clear flag, ie _ACTIVEHIGH
+                else
+                    janet_panicf("invalid SPI config option %p, in slot #%d", argv[i], i+1);
+            } else
+                janet_panicf("invalid SPI config option type, expected keyword but got %t in slot #%d", argv[i], i+1);
+        }
     }
     c->config.configOptions = options;
 
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    FT_STATUS status = FT_OK;
+    if (c->is_initialized == TRUE && c->handle)
+        status = SPI_ChangeCS(c->handle, c->config.configOptions);
+
+    return set_status_dyn(status, janet_wrap_nil());
+}
+
+JANET_FN(cfun_spi_togglecs,
+    "(spi/toggle-cs channel bool)",
+    "Toggles the current chip select line on or off") {
+    janet_fixarity(argc, 2);
+    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
+    
+    boolean value = janet_getboolean(argv, 1);
+    FT_STATUS status = SPI_ToggleCS(c->handle, value);
+    return set_status_dyn(status, janet_wrap_nil());
+}
+
+JANET_FN(cfun_spi_pins,
+    "(spi/pins channel [init] [close])",
+    "Set the direction and values of the current channel on initialization or close.\n"
+    "`init`, `close` are tuples of 8-bit `[direction value]` bytes.\n\n"
+    "* direction:   output = 1, input = 0\n"
+    "* value:       logic high = 1, low = 0\n\n"
+    "Returns the computed 32-bit option value for testing.") {
+    janet_fixarity(argc, 3);
+    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
+    
+    JanetTuple init = janet_gettuple(argv, 1);
+    JanetTuple close = janet_gettuple(argv, 2);
+    if (janet_tuple_length(init) != 2 || janet_tuple_length(close) != 2)
+        janet_panic("invalid number of tuple arguments, expected 2 each");
+
+    uint32_t init_dir = janet_getuinteger(init, 0);
+    if (init_dir > 255) janet_panicf("init direction too large, expected < 255 but got %d", init_dir);
+    uint32_t init_val = janet_getuinteger(init, 1);
+    if (init_val > 255) janet_panicf("init value too large, expected < 255 but got %d", init_val);
+    uint32_t close_dir = janet_getuinteger(close, 0);
+    if (close_dir > 255) janet_panicf("close direction too large, expected < 255 but got %d", close_dir);
+    uint32_t close_val = janet_getuinteger(close, 1);
+    if (close_val > 255) janet_panicf("close value too large, expected < 255 but got %d", close_val);
+
+    uint32_t pins = (init_dir & 0xFF)
+                  | (init_val & 0xFF) << 8
+                  | (close_dir & 0xFF) << 16
+                  | (close_val & 0xFF) << 24;
+    c->config.Pin = pins;
+    return set_status_dyn(FT_OK, janet_wrap_number(pins));
 }
 
 JANET_FN(cfun_spi_initchannel,
@@ -396,13 +462,13 @@ JANET_FN(cfun_spi_initchannel,
     "Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, "
     "and Hi-speed devices (FT232H, FT2232H, FT4232H) is 1 to 255. Default is 255.") {
     janet_arity(argc, 2, 3);
-
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
+
     uint32_t clock = janet_getuinteger(argv, 1);
         if (clock > 30000000)
             janet_panicf("clockrate %d is out of range. Expected 0 to 30,000,000 Hz", clock);
-    
     c->config.ClockRate = clock;
 
     uint32_t latency = janet_optuinteger(argv, argc, 2, 255);
@@ -410,10 +476,9 @@ JANET_FN(cfun_spi_initchannel,
         janet_panicf("latency %d out of range. expected 0 to 255", latency);
     c->config.LatencyTimer = (uint8_t)latency;
 
-    if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
-
     FT_STATUS status = SPI_InitChannel(c->handle, &c->config);
+    if (status == FT_OK)
+        c->is_initialized = TRUE;
     return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
 }
 
@@ -429,6 +494,7 @@ JANET_FN(cfun_spi_closechannel,
     
     FT_STATUS status = SPI_CloseChannel(c->handle);
     c->handle = NULL;
+    c->is_initialized = FALSE;
 
     return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
 }
@@ -439,17 +505,17 @@ JANET_FN(cfun_spi_deviceread,
     "Returns bytes read. Sets `:err` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 3);
-        
+
+    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+    
     uint32_t size = janet_getuinteger(argv, 1);
     if (size < 1)
         janet_panic("read size must be greater than 0");
 
     JanetBuffer *buffer = janet_getbuffer(argv, 2);
     janet_buffer_extra(buffer, size);
-    
-    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
     uint32_t readsz = 0;
     FT_STATUS status = SPI_Read(c->handle,
@@ -481,18 +547,28 @@ JANET_FN(cfun_spi_devicewrite,
     FT_STATUS status;
     uint32_t writesz = 0;
     uint8_t *buf = NULL;
+    uint8_t b8;
     if (janet_checktype(argv[2], JANET_NUMBER)) {
         if (size > 1)
             janet_panicf("expected size == 1 when passed an integer, got %d", size);
         uint32_t b = janet_getuinteger(argv, 2);
         if (b > 255)
             janet_panicf("invalid integer length, expected value <= 255, got %d", b);
-        buf = (uint8_t*)&b;
+        b8 = (uint8_t)b;
+        buf = &b8;
     } else {
-        JanetBuffer *buffer = janet_getbuffer(argv, 2);
-        if (size > buffer->count)
-            janet_panicf("write size %d larger than buffer size %d", size, buffer->count);
-        buf = buffer->data;
+        if (janet_checktype(argv[2], JANET_STRING)) {
+            JanetString s = janet_getstring(argv, 2);
+            size_t len = janet_string_length(s);
+            if (size > len)
+                janet_panicf("write size %d larger than string size %d", size, len);
+            buf = (uint8_t *)s;
+        } else {
+            JanetBuffer *buffer = janet_getbuffer(argv, 2);
+            if (size > buffer->count)
+                janet_panicf("write size %d larger than buffer size %d", size, buffer->count);
+            buf = buffer->data;
+        }
     }
     status = SPI_Write(c->handle,
                         buf, 
@@ -592,6 +668,21 @@ JANET_FN(cfun_spi_gpio_read,
     return set_status_dyn(status, janet_wrap_integer(value));
 }
 
+JANET_FN(cfun_spi_loopback,
+    "(spi/loopback channel bool)", "") {
+    janet_fixarity(argc, 2);
+    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+    if (NULL == c->handle)
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
+
+    boolean enable = janet_getboolean(argv, 1);
+    FT_STATUS status;
+    status = Mid_SetDeviceLoopbackState(c->handle, enable);
+    if (status != FT_OK)
+        janet_panicf("failed to set device loopback: %s", ft_status_string[status]);
+    return set_status_dyn(FT_OK, janet_wrap_nil());
+}
+
 static JanetMethod channel_methods[] = {
     {"err",             cfun_spi_get_err},
     {"info",            cfun_spi_getchannelinfo},
@@ -605,7 +696,9 @@ static JanetMethod channel_methods[] = {
     {"readwrite",       cfun_spi_readwrite},
     {"read-opt",        cfun_spi_set_read_options},
     {"write-opt",       cfun_spi_set_write_options},
-    {"config",          cfun_spi_set_config_options}
+    {"config",          cfun_spi_set_config_options},
+    {"toggle-cs",       cfun_spi_togglecs},
+    {"pins",            cfun_spi_pins}
 };
 
 static int channel_get(void *p, Janet key, Janet *out) {
@@ -627,7 +720,10 @@ static int channel_gc(void *p, size_t s) {
 
 static void channel_string(void *p, JanetBuffer *buffer) {
     channel_t *c = (channel_t *)p;
-    janet_formatb(buffer, "#%d 0x%X", c->index, (uint64_t)(uintptr_t)c);
+    char buf[16 + 6 + 1] = {0}; /* 16 hex + 6 (#99_0x) + null */
+    snprintf(buf, sizeof(buf), "#%d 0x%" PRIXPTR, c->index, (uintptr_t)c);
+    size_t len = strnlen(buf, sizeof(buf));
+    janet_buffer_push_bytes(buffer, buf, len);
 }
 
 void spi_register(JanetTable *env) {
@@ -640,6 +736,7 @@ void spi_register(JanetTable *env) {
         JANET_REG("spi/read-opt",       cfun_spi_set_read_options),
         JANET_REG("spi/write-opt",      cfun_spi_set_write_options),
         JANET_REG("spi/config",         cfun_spi_set_config_options),
+        JANET_REG("spi/toggle-cs",      cfun_spi_togglecs),
         JANET_REG("spi/open",           cfun_spi_openchannel),
         JANET_REG("spi/is-open",        cfun_spi_is_open),
         JANET_REG("spi/is-busy",        cfun_spi_is_busy),
@@ -650,6 +747,8 @@ void spi_register(JanetTable *env) {
         JANET_REG("spi/readwrite",      cfun_spi_readwrite),
         JANET_REG("spi/gpio-read",      cfun_spi_gpio_read),
         JANET_REG("spi/gpio-write",     cfun_spi_gpio_write),
+        JANET_REG("spi/loopback",       cfun_spi_loopback),
+        JANET_REG("spi/pins",           cfun_spi_pins),
         JANET_REG_END
     };
     janet_cfuns_ext(env, "spi", cfuns);
