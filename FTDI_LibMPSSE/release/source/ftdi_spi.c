@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110523
  *
- * Copyright © 2000-2014 Future Technology Devices International Limited
+ * Copyright ï¿½ 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -614,7 +614,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 	UCHAR mode;
 	UCHAR bitsToTransfer = 0;
 	DWORD noOfBytesTransferred = 0;
-	UCHAR cmdBuffer[4];
+	UCHAR cmdBuffer[3];
 	FN_ENTER;
 
 #ifdef ENABLE_PARAMETER_CHECKING
