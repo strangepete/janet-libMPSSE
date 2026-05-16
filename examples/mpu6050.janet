@@ -67,14 +67,14 @@
   [len data]
   (def chan (dyn :i2c-channel))
   (def addr (dyn :mpu6050-addr))
-  (i2c/write chan addr len data))
+  (i2c/write chan addr data len))
 
 (defn i2c-read
   "libmpsse i2c/read wrapper."
   [len buf]
   (def chan (dyn :i2c-channel))
   (def addr (dyn :mpu6050-addr))
-  (i2c/read chan addr len buf))
+  (i2c/read chan addr buf len))
 
 (defn c->f
   "Convert Celsius to Fahrenheit"
@@ -111,7 +111,6 @@
 (defn reset
   "Hard reset device registers to default values, and puts the device to sleep." # per datasheet, 107 is reset to 0x40
   []
-  (def b @"")
   (i2c-write 2 (buffer/from-bytes (reg :PWR_MGMT_1) 0x80)))
 
 (defn sleep
@@ -204,11 +203,12 @@
   Note: Writes to chip register are cleared on power off."
   [&opt offset]
   (def b (buffer/from-bytes (reg :XA_OFFSET_H)))
+  (default offset [])
   (if (= (length offset) 3)
     (each x offset
       (buffer/push-uint16 b :be x))
     (buffer/push b @"\0\0\0\0\0\0"))
-  (i2c-write 6 b))
+  (i2c-write 7 b))
 
 (defn gyro-config
   ``Set gyro Full Scale Range °/s to one of the following:
@@ -254,11 +254,12 @@
   Note: Writes to chip register are cleared on power off."
   [&opt offset]
   (def b (buffer/from-bytes (reg :XG_OFFSET_H)))
+  (default offset [])
   (if (= (length offset) 3)
     (each x offset
       (buffer/push-uint16 b :be (unsign16 x))) # cast signed to uint16
     (buffer/push b @"\0\0\0\0\0\0"))
-  (i2c-write 6 b))
+  (i2c-write 7 b))
 
 (def- byte16-grammar
   '(any (int-be 2)))

@@ -1,6 +1,6 @@
 #include "module.h"
 
-const char *ft_status_string[] = { // FT_[error]
+const char *ft_status[] = { // FT_[error]
     "ok",
     "invalid-handle",
     "device-not-found",
@@ -22,6 +22,12 @@ const char *ft_status_string[] = { // FT_[error]
     "other-error",
     "device-list-not-ready",
 };
+
+const char *ft_status_string(FT_STATUS status) {
+    if (status > sizeof(ft_status) / sizeof(ft_status[0]) - 1)
+        return "unknown-status";
+    return ft_status[status];
+}
 
 /****************/
 /* Module Entry */

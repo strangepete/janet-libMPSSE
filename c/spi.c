@@ -42,7 +42,7 @@ static const JanetAbstractType channel_type = {
 
 // Save the FT return status to dyn :ft-err, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
-    janet_setdyn("ft-err", janet_ckeywordv(ft_status_string[status]));
+    janet_setdyn("ft-err", janet_ckeywordv(ft_status_string(status)));
     return value;
 }
 
@@ -106,11 +106,11 @@ JANET_FN(cfun_spi_getchannelinfo,
     janet_fixarity(argc, 1);
 
     uint32_t index = 0;
-    if (janet_type(argv[0]) == JANET_NUMBER) {
+    if (janet_checktype(argv[0], JANET_NUMBER)) {
         index = janet_getuinteger(argv, 0);
         if (index < 1)
             return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
-    } else if (janet_type(argv[0]) == JANET_ABSTRACT) {
+    } else if (janet_checktype(argv[0], JANET_ABSTRACT)) {
         channel_t *p = (channel_t *)janet_getabstract(argv, 0, &channel_type);
         index = p->index;
     } else
@@ -166,7 +166,7 @@ JANET_FN(cfun_spi_openchannel,
     if (status != FT_OK) { // bailout if we fail here
         SPI_CloseChannel(c->handle); // probably will also quietly fail but better to be sure
         c->handle = NULL;
-        janet_panicf("failed to get channel info on a newly opened channel: %s", ft_status_string[status]);
+        janet_panicf("failed to get channel info on a newly opened channel: %s", ft_status_string(status));
     }
     c->id = chaninfo.ID;
 
@@ -489,7 +489,7 @@ JANET_FN(cfun_spi_closechannel,
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);   
-    if ((NULL == c) || (NULL == c->handle))
+    if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
     
     FT_STATUS status = SPI_CloseChannel(c->handle);
@@ -500,7 +500,7 @@ JANET_FN(cfun_spi_closechannel,
 }
 
 JANET_FN(cfun_spi_deviceread,
-    "(spi/read channel size buffer)",
+    "(spi/read channel buffer size)",
     "Read & append `size` n-bytes to `buffer`\n\n"
     "Returns bytes read. Sets `:err` to return status.\n\n"
     "This is a **blocking function**.") {
@@ -510,11 +510,11 @@ JANET_FN(cfun_spi_deviceread,
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
     
-    uint32_t size = janet_getuinteger(argv, 1);
+    uint32_t size = janet_getuinteger(argv, 2);
     if (size < 1)
         janet_panic("read size must be greater than 0");
 
-    JanetBuffer *buffer = janet_getbuffer(argv, 2);
+    JanetBuffer *buffer = janet_getbuffer(argv, 1);
     janet_buffer_extra(buffer, size);
 
     uint32_t readsz = 0;
@@ -530,42 +530,47 @@ JANET_FN(cfun_spi_deviceread,
 }
 
 JANET_FN(cfun_spi_devicewrite,
-    "(spi/write channel size buffer)",
-    "Write `size` n-bytes of `buffer`\n\n"
+    "(spi/write channel buffer &opt size)",
+    "Write optional `size` n-bytes of `buffer`\n\n"
     "Returns bytes written. Sets `:err` to return status.\n\n"
     "This is a **blocking function**.") {
-    janet_fixarity(argc, 3);
-
-    uint32_t size = janet_getuinteger(argv, 1);
-    if (size == 0)
-        janet_panicf("buffer size out of range. Expected > 0");
-
+    janet_arity(argc, 2, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
     
+    uint32_t size = 0;
+    if (argc == 3) { // optional size
+        size = janet_getuinteger(argv, 2);
+        if (size == 0)
+            janet_panicf("buffer size out of range. Expected > 0");
+    }
+
     FT_STATUS status;
     uint32_t writesz = 0;
     uint8_t *buf = NULL;
     uint8_t b8;
-    if (janet_checktype(argv[2], JANET_NUMBER)) {
-        if (size > 1)
-            janet_panicf("expected size == 1 when passed an integer, got %d", size);
-        uint32_t b = janet_getuinteger(argv, 2);
+    if (janet_checktype(argv[1], JANET_NUMBER)) {
+        size = 1;
+        uint32_t b = janet_getuinteger(argv, 1);
         if (b > 255)
             janet_panicf("invalid integer length, expected value <= 255, got %d", b);
         b8 = (uint8_t)b;
         buf = &b8;
     } else {
-        if (janet_checktype(argv[2], JANET_STRING)) {
-            JanetString s = janet_getstring(argv, 2);
+        if (janet_checktype(argv[1], JANET_STRING)) {
+            JanetString s = janet_getstring(argv, 1);
             size_t len = janet_string_length(s);
-            if (size > len)
+            if (size == 0)
+                size = len;
+            else if (size > len)
                 janet_panicf("write size %d larger than string size %d", size, len);
             buf = (uint8_t *)s;
         } else {
-            JanetBuffer *buffer = janet_getbuffer(argv, 2);
-            if (size > buffer->count)
+            JanetBuffer *buffer = janet_getbuffer(argv, 1);
+            if (size == 0)
+                size = buffer->count;
+            else if (size > buffer->count)
                 janet_panicf("write size %d larger than buffer size %d", size, buffer->count);
             buf = buffer->data;
         }
@@ -579,7 +584,7 @@ JANET_FN(cfun_spi_devicewrite,
 }
 
 JANET_FN(cfun_spi_readwrite,
-    "(spi/readwrite channel size sendbuf recvbuf)",
+    "(spi/readwrite channel sendbuf size recvbuf)",
     "Simultaneously read & write `size` n-bytes to `channel`.\n\n"
     "Returns bytes transfered. Sets `:err` to return status.\n\n"
     "Note: Uses the `write-opt` transfer option for both operations.\n\n"
@@ -590,11 +595,11 @@ JANET_FN(cfun_spi_readwrite,
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
 
-    uint32_t size = janet_getuinteger(argv, 1);
+    uint32_t size = janet_getuinteger(argv, 2);
     if (size == 0)
         janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
-    JanetBuffer *sendbuf = janet_getbuffer(argv, 2);
+    JanetBuffer *sendbuf = janet_getbuffer(argv, 1);
     if (size > sendbuf->count)
         janet_panicf("write size %d larger than sendbuf size %d", size, sendbuf->count);
 
@@ -680,7 +685,7 @@ JANET_FN(cfun_spi_loopback,
     FT_STATUS status;
     status = Mid_SetDeviceLoopbackState(c->handle, enable);
     if (status != FT_OK)
-        janet_panicf("failed to set device loopback: %s", ft_status_string[status]);
+        janet_panicf("failed to set device loopback: %s", ft_status_string(status));
     return set_status_dyn(FT_OK, janet_wrap_nil());
 }
 
@@ -699,7 +704,8 @@ static JanetMethod channel_methods[] = {
     {"write-opt",       cfun_spi_set_write_options},
     {"config",          cfun_spi_set_config_options},
     {"toggle-cs",       cfun_spi_togglecs},
-    {"pins",            cfun_spi_pins}
+    {"pins",            cfun_spi_pins},
+    {NULL, NULL}
 };
 
 static int channel_get(void *p, Janet key, Janet *out) {

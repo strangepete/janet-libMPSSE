@@ -37,11 +37,11 @@
         "-D_DEBUG"])]))
 
 (declare-source
+  :prefix "libmpsse"
   :source ["libmpsse/"])
 
 (declare-native
   :name "_libmpsse"
-  :prefix "libmpsse"
   :cflags cflags
   :ldflags [;default-ldflags
             (when (windows?) "/DEBUG")]

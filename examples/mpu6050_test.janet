@@ -23,11 +23,11 @@
   (os/sleep 1))
 (print "")
 
-(if-not (mpu/who-am-i 0x68)
+(if-not (me 0x68)
   (do
     (printf "who-am-i: Device address mismatch: 0x%x" me)
     (os/exit 1)))
-(printf "I am : 0x%X" (mpu/who-am-i))
+(printf "I am : 0x%X" (me))
 (printf "Temperature: %-.1f°F" (mpu/get-temp :f)) 
 
 # Gyro Full Scale Range to 250 deg/s
