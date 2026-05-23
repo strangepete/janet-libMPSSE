@@ -37,14 +37,13 @@
         "-D_DEBUG"])]))
 
 (declare-source
-  :prefix "libmpsse"
   :source ["libmpsse/"])
 
 (declare-native
   :name "_libmpsse"
   :cflags cflags
   :ldflags [;default-ldflags
-            (when (windows?) "/DEBUG")]
+            ;(if (and debugging windows?) ["/DEBUG"] [])]
   :source @["FTDI_LibMPSSE/release/source/ftdi_mid.c"
             "FTDI_LibMPSSE/release/source/ftdi_infra.c"
             "FTDI_LibMPSSE/release/source/ftdi_spi.c"

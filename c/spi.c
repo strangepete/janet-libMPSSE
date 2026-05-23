@@ -5,7 +5,7 @@
 
 
 typedef struct {
-    boolean         is_initialized;
+    uint32_t        is_initialized;
     uint32_t        index;          // 1-based, as user-entered
     uint32_t        id;             // unique id per-channel set by libmpsse
     FT_HANDLE       handle;
