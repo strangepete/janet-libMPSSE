@@ -4,7 +4,7 @@
  * \author FTDI
  * \date 20110523
  *
- * Copyright ÔøΩ 2000-2014 Future Technology Devices International Limited
+ * Copyright ù 2000-2014 Future Technology Devices International Limited
  *
  *
  * THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED ``AS IS'' AND ANY EXPRESS
@@ -412,6 +412,7 @@ FTDIMPSSE_API FT_STATUS SPI_Read(FT_HANDLE handle, UCHAR *buffer,
 	{/*sizeToTransfer is in bytes*/
 		DWORD noOfBytesTransferred = 0, CurrentXferSize = 0;
 		uint8 cmdBuffer[4];
+		uint32 noOfBytes = 0;
 		ChannelConfig *config = NULL;
 		uint8 mode;
 
@@ -423,16 +424,16 @@ FTDIMPSSE_API FT_STATUS SPI_Read(FT_HANDLE handle, UCHAR *buffer,
 		switch(mode)
 		{
 			case 0:
-				cmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE | lsb;
 				break;
 			case 1:
-				cmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE | lsb;
 				break;
 			case 2:
-				cmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE | lsb;
 				break;
 			case 3:
-				cmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE | lsb;
 				break;
 			default:
 				DBG(MSG_ERR,"invalid mode(%u)\n",(unsigned)mode);
@@ -441,16 +442,17 @@ FTDIMPSSE_API FT_STATUS SPI_Read(FT_HANDLE handle, UCHAR *buffer,
 		*sizeTransferred = 0;
 		while(*sizeTransferred < sizeToTransfer)
 		{
+			noOfBytes = 1;
 		
 			CurrentXferSize = ((sizeToTransfer - *sizeTransferred) > 64*1024)? 64*1024:(sizeToTransfer - *sizeTransferred);
 			/* length LSB */
-			cmdBuffer[1] = (uint8)((CurrentXferSize-1) & 0x000000FF) ;
+			cmdBuffer[noOfBytes++] = (uint8)((CurrentXferSize-1) & 0x000000FF) ;
 			/* length MSB */
-			cmdBuffer[2] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
+			cmdBuffer[noOfBytes++] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
 
 			/*Command MPSSE to send data to PC immediately */
-			cmdBuffer[3] = MPSSE_CMD_SEND_IMMEDIATE;
-			status = FT_Channel_Write(SPI, handle, 4, cmdBuffer,
+			cmdBuffer[noOfBytes++] = MPSSE_CMD_SEND_IMMEDIATE;
+			status = FT_Channel_Write(SPI, handle, noOfBytes, cmdBuffer,
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			noOfBytesTransferred = 0;
@@ -537,7 +539,8 @@ FTDIMPSSE_API FT_STATUS SPI_Write(FT_HANDLE handle, UCHAR *buffer,
 	else
 	{/* sizeToTransfer is in bytes */
 		DWORD noOfBytesTransferred = 0, CurrentXferSize = 0;
-		uint8 cmdBuffer[3];
+		uint8 cmdBuffer[5];
+		uint32 noOfBytes = 0;
 		ChannelConfig *config = NULL;
 		uint8 mode;
 
@@ -549,16 +552,16 @@ FTDIMPSSE_API FT_STATUS SPI_Write(FT_HANDLE handle, UCHAR *buffer,
 		switch(mode)
 		{
 			case SPI_CONFIG_OPTION_MODE0:
-				cmdBuffer[0] = MPSSE_CMD_DATA_OUT_BYTES_NEG_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BYTES_NEG_EDGE | lsb;
 				break;
 			case SPI_CONFIG_OPTION_MODE1:
-				cmdBuffer[0] = MPSSE_CMD_DATA_OUT_BYTES_POS_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BYTES_POS_EDGE | lsb;
 				break;
 			case SPI_CONFIG_OPTION_MODE2:
-				cmdBuffer[0] = MPSSE_CMD_DATA_OUT_BYTES_POS_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BYTES_POS_EDGE | lsb;
 				break;
 			case SPI_CONFIG_OPTION_MODE3:
-				cmdBuffer[0] = MPSSE_CMD_DATA_OUT_BYTES_NEG_EDGE | lsb;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_OUT_BYTES_NEG_EDGE | lsb;
 				break;
 			default:
 				DBG(MSG_ERR,"invalid mode(%u)\n",(unsigned)mode);
@@ -568,18 +571,19 @@ FTDIMPSSE_API FT_STATUS SPI_Write(FT_HANDLE handle, UCHAR *buffer,
 		
 		while(*sizeTransferred < sizeToTransfer)
 		{
+			noOfBytes = 1;
 
 			CurrentXferSize = ((sizeToTransfer - *sizeTransferred) > 64*1024)? 64*1024:(sizeToTransfer - *sizeTransferred);
 			/* length low byte */
-			cmdBuffer[1] = (uint8)((CurrentXferSize-1) & 0x000000FF);
+			cmdBuffer[noOfBytes++] = (uint8)((CurrentXferSize-1) & 0x000000FF);
 			/* length high byte */
-			cmdBuffer[2] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
+			cmdBuffer[noOfBytes++] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
 			/* write command */
-			status = FT_Channel_Write(SPI, handle, 3, cmdBuffer,\
+			status = FT_Channel_Write(SPI, handle, noOfBytes, cmdBuffer,\
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			/* write data */
-			status = FT_Channel_Write(SPI, handle, CurrentXferSize, buffer,\
+			status = FT_Channel_Write(SPI, handle, CurrentXferSize, &buffer[*sizeTransferred],\
 				&noOfBytesTransferred);
 			*sizeTransferred += noOfBytesTransferred;
 			
@@ -648,20 +652,21 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 	if (transferOptions & SPI_TRANSFER_OPTIONS_SIZE_IN_BITS)
 	{/* sizeToTransfer is in bits */
 		*sizeTransferred = 0;
+		uint32 noOfBytes = 0;
 		/* Command to write 8bits */
 		switch(mode)
 		{
 			case SPI_CONFIG_OPTION_MODE0:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BITS_IN_POS_OUT_NEG_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BITS_IN_POS_OUT_NEG_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE1:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BITS_IN_NEG_OUT_POS_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BITS_IN_NEG_OUT_POS_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE2:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BITS_IN_NEG_OUT_POS_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BITS_IN_NEG_OUT_POS_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE3:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BITS_IN_POS_OUT_NEG_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BITS_IN_POS_OUT_NEG_EDGE;
 				break;
 			default:
 				DBG(MSG_ERR,"invalid mode(%u)\n",(unsigned)mode);
@@ -669,15 +674,16 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 		
 		while(*sizeTransferred < sizeToTransfer)
 		{
+			noOfBytes = 1;
 			if ((sizeToTransfer - *sizeTransferred)>=8)
 				bitsToTransfer = 8;
 			else
 				bitsToTransfer = (UCHAR)(sizeToTransfer - *sizeTransferred);
-			cmdBuffer[1] = bitsToTransfer - 1; /*takes value 0 for 1 bit; 7 for 8 bits*/
-			cmdBuffer[2] = outBuffer[(*sizeTransferred+1)/8];
+			cmdBuffer[noOfBytes++] = bitsToTransfer - 1; /*takes value 0 for 1 bit; 7 for 8 bits*/
+			cmdBuffer[noOfBytes++] = outBuffer[(*sizeTransferred+1)/8];
 
 			/*Write command and data*/
-			status = FT_Channel_Write(SPI, handle, sizeof(cmdBuffer), cmdBuffer,\
+			status = FT_Channel_Write(SPI, handle, noOfBytes, cmdBuffer,\
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			if (3 > noOfBytesTransferred)
@@ -704,23 +710,24 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 	else
 	{
 		uint32 CurrentXferSize = 0;
+		uint32 noOfBytes = 0;
 		/* Command to write 8bits */
 		switch(mode)
 		{
 			case SPI_CONFIG_OPTION_MODE0:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BYTES_IN_POS_OUT_NEG_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BYTES_IN_POS_OUT_NEG_EDGE;
 //				rCmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE1:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BYTES_IN_NEG_OUT_POS_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BYTES_IN_NEG_OUT_POS_EDGE;
 //				rCmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE2:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BYTES_IN_NEG_OUT_POS_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BYTES_IN_NEG_OUT_POS_EDGE;
 //				rCmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_NEG_EDGE;
 				break;
 			case SPI_CONFIG_OPTION_MODE3:
-				cmdBuffer[0] = MPSSE_CMD_DATA_BYTES_IN_POS_OUT_NEG_EDGE;
+				cmdBuffer[noOfBytes++] = MPSSE_CMD_DATA_BYTES_IN_POS_OUT_NEG_EDGE;
 //				rCmdBuffer[0] = MPSSE_CMD_DATA_IN_BYTES_POS_EDGE;
 				break;
 			default:
@@ -734,18 +741,19 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 		*sizeTransferred = 0;
 		while(*sizeTransferred < sizeToTransfer)
 		{
+			noOfBytes = 1;
 		
 			CurrentXferSize = ((sizeToTransfer - *sizeTransferred) > 64*1024)? 64*1024:(sizeToTransfer - *sizeTransferred);
 			/* length LSB */
-			cmdBuffer[1] = (uint8)((CurrentXferSize-1) & 0x000000FF) ;
+			cmdBuffer[noOfBytes++] = (uint8)((CurrentXferSize-1) & 0x000000FF) ;
 			/* length MSB */
-			cmdBuffer[2] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
+			cmdBuffer[noOfBytes++] = (uint8)(((CurrentXferSize-1) & 0x0000FF00)>>8);
 			//cmdBuffer[3] = MPSSE_CMD_SEND_IMMEDIATE;
 
 //			memcpy(&cmdBuffer[3],outBuffer, CurrentXferSize);
 			
 			/*Write command*/					
-			status = FT_Channel_Write(SPI, handle, sizeof(cmdBuffer),cmdBuffer,
+			status = FT_Channel_Write(SPI, handle, noOfBytes, cmdBuffer,
 				&noOfBytesTransferred);
 			CHECK_STATUS(status);
 			noOfBytesTransferred = 0;
@@ -849,7 +857,7 @@ FTDIMPSSE_API FT_STATUS SPI_ReadWrite(FT_HANDLE handle, UCHAR *inBuffer,
 FTDIMPSSE_API FT_STATUS SPI_IsBusy(FT_HANDLE handle, BOOL *state)
 {
 	FT_STATUS status = FT_OTHER_ERROR;
-	DWORD noOfBytes = 0, noOfBytesTransferred = 0;
+	uint32 noOfBytes = 0, noOfBytesTransferred = 0;
 	uint8 buffer[10];
 
 	FN_ENTER;

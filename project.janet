@@ -5,18 +5,19 @@
   :author "Peter Rippe"
   :license "MIT"
   :url "https://github.com/strangepete/janet-libMPSSE"
+  :repo "git+https://github.com/strangepete/janet-libMPSSE.git"
   :version "0.0.4")
-(def debugging true)
 
+(def debugging (if (= (os/getenv "DEBUG") "1") true false))
 (defn if-debug [x] (if debugging x []))
-(defn windows? [] (if (= (os/which) :windows) true false))
+(def windows? (if (= (os/which) :windows) true false))
 
 (def cflags
   (case (os/which)
     :windows [;default-cflags
               "/DUNICODE"
               "/D_UNICODE"
-              "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=8" # libMPSSE version
+              "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=9" # libMPSSE version
               "/DFTDIMPSSE_STATIC"
               "/IFTDI_LibMPSSE/release/include"
               "/IFTDI_LibMPSSE/release/libftd2xx"
@@ -26,14 +27,14 @@
                  "/Z7"
                  "/D_DEBUG"])]
     [;default-cflags
-     "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=8"
+     "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=9"
      "-DFTDIMPSSE_STATIC"
      "-D_DEFAULT_SOURCE" # needed for usleep()
      "-IFTDI_LibMPSSE/release/include"
      "-IFTDI_LibMPSSE/release/libftd2xx"
      "-IFTDI_LibMPSSE/release/source"
      ;(if-debug
-       [#"-DINFRA_DEBUG_ENABLE"
+       [#"-DINFRA_DEBUG_ENABLE" # libmpsse *verbose* debugging
         "-D_DEBUG"])]))
 
 (declare-source

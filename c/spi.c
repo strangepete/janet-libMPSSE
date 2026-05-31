@@ -5,7 +5,7 @@
 
 
 typedef struct {
-    uint32_t        is_initialized;
+    BOOL            is_initialized;
     uint32_t        index;          // 1-based, as user-entered
     uint32_t        id;             // unique id per-channel set by libmpsse
     FT_HANDLE       handle;
@@ -414,7 +414,7 @@ JANET_FN(cfun_spi_togglecs,
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
     
-    boolean value = janet_getboolean(argv, 1);
+    BOOL value = janet_getboolean(argv, 1);
     FT_STATUS status = SPI_ToggleCS(c->handle, value);
     return set_status_dyn(status, janet_wrap_nil());
 }
@@ -681,7 +681,7 @@ JANET_FN(cfun_spi_loopback,
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
-    boolean enable = janet_getboolean(argv, 1);
+    BOOL enable = janet_getboolean(argv, 1);
     FT_STATUS status;
     status = Mid_SetDeviceLoopbackState(c->handle, enable);
     if (status != FT_OK)

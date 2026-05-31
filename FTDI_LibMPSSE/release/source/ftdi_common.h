@@ -38,7 +38,7 @@
 #define FT_VER_MINOR		0
 #endif // FT_VER_MINOR
 #ifndef FT_VER_BUILD
-#define FT_VER_BUILD		8
+#define FT_VER_BUILD		9
 #endif // FT_VER_BUILD
 
 /******************************************************************************/
