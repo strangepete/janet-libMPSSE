@@ -22,7 +22,7 @@
               "/IFTDI_LibMPSSE/release/include"
               "/IFTDI_LibMPSSE/release/libftd2xx"
               ;(if-debug
-                [#"/DINFRA_DEBUG_ENABLE" # libmpsse offers *verbose* debugging
+                ["/DINFRA_DEBUG_ENABLE" # libmpsse offers *verbose* debugging
                  "/fsanitize=address"
                  "/Z7"
                  "/D_DEBUG"])]
@@ -34,7 +34,7 @@
      "-IFTDI_LibMPSSE/release/libftd2xx"
      "-IFTDI_LibMPSSE/release/source"
      ;(if-debug
-       [#"-DINFRA_DEBUG_ENABLE" # libmpsse *verbose* debugging
+       ["-DINFRA_DEBUG_ENABLE" # libmpsse *verbose* debugging
         "-D_DEBUG"])]))
 
 (declare-source

@@ -39,8 +39,4 @@ JANET_MODULE_ENTRY(JanetTable *env) {
         It does make it easier to add other modules in the future (ie, JTAG) */
     spi_register(env);
     i2c_register(env);
-
-#ifdef _MSC_VER
-    Init_libMPSSE();
-#endif
 }

@@ -5,10 +5,9 @@
 
 typedef struct {
     uint32_t        index;          // 1-based, as user-entered
-    uint32_t        id;             // unique id per-channel set by libmpsse
     FT_HANDLE       handle;
     ChannelConfig   config;
-    uint32_t        read_options;   // these are use per-read/write
+    uint32_t        read_options;   // these are used per-read/write
     uint32_t        write_options;  //
 } channel_t;
 
@@ -38,7 +37,7 @@ static const JanetAbstractType channel_type = {
 /* C Functions */
 /***************/
 
-// Save the FT return status to dyn :ft-err, and return the value directly.
+// Save the FT return status to dyn *ft-err*, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
     janet_setdyn("ft-err", janet_ckeywordv(ft_status_string(status)));
     return value;
@@ -69,7 +68,7 @@ JANET_FN(cfun_i2c_get_err,
     "* `:not-supported`\n"
     "* `:other-error`\n"
     "* `:device-list-not-ready`\n\n"
-    "Note: currently a wrapper for (dyn :ft-err)") {
+    "Note: currently a wrapper for (dyn *ft-err*)") {
     janet_arity(argc, 0, 1);
     return janet_dyn("ft-err");
 }
@@ -77,11 +76,10 @@ JANET_FN(cfun_i2c_get_err,
 JANET_FN(cfun_i2c_channelcount,
     "(i2c/channels)",
     "Get the number of I2C channels that are connected to the host system. "
-    "Sets `:err` to return status.\n\n"
+    "Sets `*ft-err*` to return status.\n\n"
     "Note: The number of ports available in each chip is different, but must be an MPSSE chip or cable.\n\n"
     "This function is **not thread-safe**.") {
     janet_fixarity(argc, 0);
-
     uint32_t chans = 0;
     FT_STATUS status = I2C_GetNumChannels(&chans);
     return set_status_dyn(status, janet_wrap_integer(chans));
@@ -91,11 +89,11 @@ JANET_FN(cfun_i2c_getchannelinfo,
     "(i2c/info index)",
     "Retrieve detailed information about an I2C channel, "
     "given a 1-based channel `index`, or an `<i2c/channel>` object.\n"
-    "Returns `nil` on error. Sets `:err` to return status.\n\n"
+    "Returns `nil` on error and sets `*ft-err*` to return status.\n\n"
     "On success, returns a table:\n"
     "* `:serial`      - Serial number of the device\n"
     "* `:description` - Device description\n"
-    "* `:id`          - Unique channel ID\n"
+    "* `:id`          - Device ID\n"
     "* `:locid`       - USB location ID\n"
     "* `:handle`      - Device handle (internal pointer)\n"
     "* `:type`        - Device type\n"
@@ -107,10 +105,10 @@ JANET_FN(cfun_i2c_getchannelinfo,
     if (janet_checktype(argv[0], JANET_NUMBER)) {
         index = janet_getuinteger(argv, 0);
         if (index < 1)
-            return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
+            return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_nil());
     } else if (janet_checktype(argv[0], JANET_ABSTRACT)) {
-        channel_t *p = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-        index = p->index;
+        channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+        index = c->index;
     } else
         janet_panicf("invalid type, expected <i2c/channel> or index, got %t", argv[0]);
     
@@ -131,45 +129,26 @@ JANET_FN(cfun_i2c_getchannelinfo,
     return set_status_dyn(FT_OK, janet_wrap_struct(janet_struct_end(out)));
 }
 
-JANET_FN(cfun_i2c_get_id,
-    "(i2c/id channel)",
-    "Takes an `<i2c/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.") {
-    janet_fixarity(argc, 1);
-
-    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    return janet_wrap_integer(c->id);
-}
-
 JANET_FN(cfun_i2c_openchannel,
     "(i2c/open index)",
     "Open a channel by (1-based) `index`.\n\n"
-    "Returns an `<i2c/channel>` if succesful, or `nil` on error. Sets `:err` to return status.\n\n") {
+    "Returns an `<i2c/channel>` or `nil` on error and "
+    "sets `*ft-err*` to return status.\n\n") {
     janet_fixarity(argc, 1);
 
     uint32_t index = janet_getuinteger(argv, 0);
     if (index < 1)
-        return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
+        return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_nil());
     
     channel_t *c = (channel_t *)janet_abstract(&channel_type, sizeof(channel_t));
     memset(c, 0x0, sizeof(channel_t));
     c->index = index;
-
     FT_STATUS status = I2C_OpenChannel((index - 1), &c->handle);
     if (status != FT_OK)
         return set_status_dyn(status, janet_wrap_nil());
 
     // D2XX USB latency config option; requires d2xx linked
     // FT_SetLatencyTimer(c->handle, 2); // set USB latency from default of 16 ms to 2
-
-    FT_DEVICE_LIST_INFO_NODE chaninfo;
-    status = I2C_GetChannelInfo((index - 1), &chaninfo);
-    if (status != FT_OK) { // bailout if we fail here
-        I2C_CloseChannel(c->handle); // probably will also quietly fail but better to be sure
-        c->handle = NULL;
-        janet_panicf("failed to get channel info on a newly opened channel: %s", ft_status_string(status));
-    }
-    c->id = chaninfo.ID;
-
     return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
@@ -187,7 +166,7 @@ JANET_FN(cfun_i2c_find,
     "* `:type`  - Device type (integer)\n"
     "* `:description` - (string)\n"
     "* `:serial`    - (string)\n\n"
-    "Returns a channel `index` or `nil` on failure. Sets `:err` to return status.") {
+    "Returns a channel `index` or `nil` on failure. Sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 2);
 
     if (!janet_checktype(argv[0], JANET_KEYWORD))
@@ -272,7 +251,8 @@ JANET_FN(cfun_i2c_find,
 
 JANET_FN(cfun_i2c_is_open,
     "(i2c/is-open channel)",
-    "Returns true if a channel is open, or false if closed or invalid. Sets `:err` to return status.\n\n"
+    "Returns true if a channel is open, or false if closed or invalid. "
+    "Sets `*ft-err*` to return status.\n\n"
     "Takes either an `<i2c/channel>` object, or 1-based `index`.") {
     janet_fixarity(argc, 1);
 
@@ -284,11 +264,11 @@ JANET_FN(cfun_i2c_is_open,
         index = c->index;
     } // fall thru if we have a channel index
 
-    if (janet_checktype(argv[0], JANET_NUMBER) || index > 0) {
+    if (index > 0 || janet_checktype(argv[0], JANET_NUMBER)) {
         FT_DEVICE_LIST_INFO_NODE chaninfo;
         if (index == 0)
             if ((index = janet_getuinteger(argv, 0)) == 0)
-                return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
+                return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_boolean(FALSE));
 
         FT_STATUS status = I2C_GetChannelInfo((index - 1), &chaninfo);
         if (status != FT_OK)
@@ -332,18 +312,19 @@ uint32_t transfer_option_keywords(int32_t argc, Janet *argv, int rw) {
 
 JANET_FN(cfun_i2c_set_write_options,
     "(i2c/write-opt channel &opt kw ...)",
-    "Set I2C Write transfer options. Takes zero, or more keywords:\n\n"
+    "Set I2C Write transfer options. Returns `channel`. "
+    "Takes zero, or more keywords:\n\n"
     "* `:start`\n"
     "* `:stop`\n"
     "* `:break-on-nak`\n"
     "* `:fast-transfer-bytes`\n"
     "* `:fast-transfer-bits`\n"
-    "* `:no-address`\n\n") {
+    "* `:no-address`\n\n"
+    "Returns `channel`.") {
     janet_arity(argc, 1, 6);
-
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->write_options = transfer_option_keywords(argc, argv, WRITE_TRANSFER_OPT);
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_i2c_set_read_options,
@@ -354,12 +335,12 @@ JANET_FN(cfun_i2c_set_read_options,
     "* `:nak-last-byte`\n"
     "* `:fast-transfer-bytes`\n"
     "* `:fast-transfer-bits`\n"
-    "* `:no-address`\n\n") {
+    "* `:no-address`\n\n"
+    "Returns `channel`.") {
     janet_arity(argc, 1, 6);
-
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->read_options = transfer_option_keywords(argc, argv, READ_TRANSFER_OPT);
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 #define I2C_ENABLE_DRIVE_ONLY_ZERO 0x0002 // Documented in AN-177, but missing in libmpsse header?
@@ -369,13 +350,14 @@ JANET_FN(cfun_i2c_set_config_options,
     "Set channel config options. Takes zero, or more keywords:\n\n"
     "* `:disable-3phase-clocking`\n"
     "* `:enable-drive-only-zero`\n\n"
-    "Note: 3-phase clocking only available on hi-speed devices, not the FT2232D. "
+    "Returns `channel`.\n\n"
+    "Note: \n"
+    "3-phase clocking only available on hi-speed devices, not the FT2232D. "
     "Drive-only-zero is only available on the FT232H.") {
     janet_arity(argc, 1, 3);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-
-    uint32_t options = 0;
+    uint32_t options = 0x00;
     for (int i = 1; i < argc; i++) {
         if (janet_checktype(argv[i], JANET_KEYWORD)) {
             JanetKeyword opt = janet_unwrap_keyword(argv[i]);
@@ -390,13 +372,14 @@ JANET_FN(cfun_i2c_set_config_options,
     }
     c->config.Options = options;
 
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_i2c_initchannel,
     "(i2c/init channel &opt clockrate latency)",
     "Initialize an open `channel` with optional `clockrate` and `latency`. "
-    "Returns `true` if successful, or `false` on error. Sets :err to return status.\n\n"
+    "Returns `channel`, or `nil` on error and "
+    "sets `*ft-err*` to return status.\n\n"
     "Clock rate is one of the following keywords:\n\n"
     "* `:standard`   - 100kb/s (default)\n"
     "* `:fast`       - 400kb/s\n"
@@ -409,7 +392,7 @@ JANET_FN(cfun_i2c_initchannel,
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     I2C_CLOCKRATE rate = I2C_CLOCK_STANDARD_MODE;
     if (argc > 1) {
@@ -440,13 +423,14 @@ JANET_FN(cfun_i2c_initchannel,
     c->config.LatencyTimer = (uint8_t)latency;
 
     FT_STATUS status = I2C_InitChannel(c->handle, &c->config);
-    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
+    return set_status_dyn(status, (status == FT_OK) ? janet_wrap_abstract(c)
+                                                    :  janet_wrap_nil());
 }
 
 JANET_FN(cfun_i2c_closechannel,
     "(i2c/close channel)",
     "Closes the specified channel. "
-    "Returns `true` if successful. Sets `:err` to return status.") {
+    "Returns `true` if successful. Sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);   
@@ -463,7 +447,7 @@ JANET_FN(cfun_ft_gpio_write,
     "(i2c/gpio-write channel dir value)",
     "Write to GPIO lines, where `direction` and `value` are an 8-bit value mapping each line. "
     "Direction bit 0 for in, and 1 for out. Value is 0 logic low, 1 logic high.\n\n"
-    "Returns `nil`. Sets `:err` to return status.\n\n"
+    "Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in "
     "FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.") {
     janet_fixarity(argc, 3);
@@ -480,14 +464,16 @@ JANET_FN(cfun_ft_gpio_write,
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     FT_STATUS status = FT_WriteGPIO(c->handle, (uint8_t)dir, (uint8_t)value);
-    return set_status_dyn(status, janet_wrap_nil());
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_ft_gpio_read, 
     "(i2c/gpio-read channel)", 
     "Read the 8 GPIO lines from the high byte of the MPSSE channel.\n\n"
-    "Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return status.\n\n"
-    "Note: **Must call write-gpio to initialize before reading**. See the libMPSSE.") {
+    "Returns an unsigned 8-bit integer, or `nil` on error. Sets `*ft-err*` to return status.\n\n"
+    "Note: **Must call `write-gpio` to initialize before reading**. See the libMPSSE.") {
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
@@ -496,19 +482,21 @@ JANET_FN(cfun_ft_gpio_read,
 
     uint8_t value = 0;
     FT_STATUS status = FT_ReadGPIO(c->handle, &value);
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_integer(value));
 }
 
 JANET_FN(cfun_i2c_deviceread,
     "(i2c/read channel address buffer size)",
     "Read & append `size` n-bytes to `buffer` from I2C device at `address`.\n\n"
-    "Returns bytes read. Sets `:err` to return status.\n\n"
+    "Returns `buffer`, or `nil` and sets `*ft-err*` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
     
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     uint32_t address = janet_getuinteger(argv, 1);
     if (address > 127)
@@ -531,13 +519,15 @@ JANET_FN(cfun_i2c_deviceread,
     if (readsz > 0)
         buffer->count += readsz;
 
-    return set_status_dyn(status, janet_wrap_integer(readsz));
+    if (status != FT_OK)
+         return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_buffer(buffer));
 }
 
 JANET_FN(cfun_i2c_devicewrite,
     "(i2c/write channel address buffer &opt size)",
     "Write optional `size` n-bytes of `buffer` to I2C channel/device `address`.\n\n"
-    "Returns bytes written. Sets `:err` to return status.\n\n"
+    "Returns bytes written. Sets `*ft-err*` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_arity(argc, 3, 4);
 
@@ -605,7 +595,7 @@ static Janet version_to_tuple(uint32_t ver) {
 
 JANET_FN(cfun_ft_ver_libmpsse,
     "(ft/version)",
-    "Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]") {
+    "Return a tuple of the libMPSSE and ftd2xx version numbers each as [major minor build]") {
     uint32_t libmpsse, ftd2xx;
 
     FT_STATUS status = Ver_libMPSSE(&libmpsse, &ftd2xx);
@@ -621,7 +611,6 @@ JANET_FN(cfun_ft_ver_libmpsse,
 static JanetMethod channel_methods[] = {
     {"err",             cfun_i2c_get_err},
     {"info",            cfun_i2c_getchannelinfo},
-    {"id",              cfun_i2c_get_id},
     {"is-open",         cfun_i2c_is_open},
     {"close",           cfun_i2c_closechannel},
     {"init",            cfun_i2c_initchannel},
@@ -664,7 +653,6 @@ void i2c_register(JanetTable *env) {
         JANET_REG("i2c/channels",       cfun_i2c_channelcount),
         JANET_REG("i2c/info",           cfun_i2c_getchannelinfo),
         JANET_REG("i2c/find-by",        cfun_i2c_find),
-        JANET_REG("i2c/id",             cfun_i2c_get_id),
         JANET_REG("i2c/read-opt",       cfun_i2c_set_read_options),
         JANET_REG("i2c/write-opt",      cfun_i2c_set_write_options),
         JANET_REG("i2c/config",         cfun_i2c_set_config_options),

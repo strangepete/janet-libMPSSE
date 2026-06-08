@@ -52,7 +52,7 @@
           (def recvbuf @"")
           (spi/init c 1_000_000)
           (assert (= :ok (:err c)) (spi/err))
-          (prin "loopback test...")
+          (prin "loopback test...")(flush)
           (spi/loopback c true)
           (assert (= :ok (:err c)) (spi/err))
           (spi/readwrite c sendbuf (length sendbuf) recvbuf)

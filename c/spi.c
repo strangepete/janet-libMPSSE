@@ -7,7 +7,6 @@
 typedef struct {
     BOOL            is_initialized;
     uint32_t        index;          // 1-based, as user-entered
-    uint32_t        id;             // unique id per-channel set by libmpsse
     FT_HANDLE       handle;
     ChannelConfig   config;
     uint32_t        read_options;   // these are use per-read/write
@@ -40,7 +39,7 @@ static const JanetAbstractType channel_type = {
 /* C Functions */
 /***************/
 
-// Save the FT return status to dyn :ft-err, and return the value directly.
+// Save the FT return status to dyn *ft-err*, and return the value directly.
 static Janet set_status_dyn(FT_STATUS status, Janet value) {
     janet_setdyn("ft-err", janet_ckeywordv(ft_status_string(status)));
     return value;
@@ -71,7 +70,7 @@ JANET_FN(cfun_spi_get_err,
     "* `:not-supported`\n"
     "* `:other-error`\n"
     "* `:device-list-not-ready`\n\n"
-    "Note: currently a wrapper for (dyn :ft-err)") {
+    "Note: currently a wrapper for (dyn *ft-err*)") {
     janet_arity(argc, 0, 1);
     return janet_dyn("ft-err");
 }
@@ -79,11 +78,10 @@ JANET_FN(cfun_spi_get_err,
 JANET_FN(cfun_spi_channelcount,
     "(spi/channels)",
     "Get the number of SPI channels that are connected to the host system. "
-    "Sets `:err` to return status.\n\n"
+    "Sets `*ft-err*` to return status.\n\n"
     "Note: The number of ports available in each chip is different, but must be an MPSSE chip or cable.\n\n"
     "This function is **not thread-safe**.") {
     janet_fixarity(argc, 0);
-
     uint32_t chans = 0;
     FT_STATUS status = SPI_GetNumChannels(&chans);
     return set_status_dyn(status, janet_wrap_integer(chans));
@@ -93,7 +91,7 @@ JANET_FN(cfun_spi_getchannelinfo,
     "(spi/info index)",
     "Retrieve detailed information about an SPI channel, "
     "given a 1-based channel `index`, or an `<spi/channel>` object.\n"
-    "Returns `nil` on error. Sets `:err` to return status.\n\n"
+    "Returns `nil` on error and sets `*ft-err*` to return status.\n\n"
     "On success, returns a table:\n"
     "* `:serial`      - Serial number of the device\n"
     "* `:description` - Device description\n"
@@ -109,10 +107,10 @@ JANET_FN(cfun_spi_getchannelinfo,
     if (janet_checktype(argv[0], JANET_NUMBER)) {
         index = janet_getuinteger(argv, 0);
         if (index < 1)
-            return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
+            return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_nil());
     } else if (janet_checktype(argv[0], JANET_ABSTRACT)) {
-        channel_t *p = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-        index = p->index;
+        channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
+        index = c->index;
     } else
         janet_panicf("invalid type, expected <spi/channel> or index, got %t", argv[0]);
     
@@ -133,42 +131,26 @@ JANET_FN(cfun_spi_getchannelinfo,
     return set_status_dyn(FT_OK, janet_wrap_struct(janet_struct_end(out)));
 }
 
-JANET_FN(cfun_spi_get_id,
-    "(spi/id channel)",
-    "Takes an `<spi/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.") {
-    janet_fixarity(argc, 1);
-
-    channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
-    return janet_wrap_integer(c->id);
-}
-
 JANET_FN(cfun_spi_openchannel,
     "(spi/open index)",
     "Open a channel by (1-based) `index`.\n\n"
-    "Returns an `<spi/channel>` if succesful, or `nil` on error. Sets `:err` to return status.\n\n") {
+    "Returns an `<spi/channel>` or `nil` on error and "
+    "sets `*ft-err*` to return status.\n\n") {
     janet_fixarity(argc, 1);
 
     uint32_t index = janet_getuinteger(argv, 0);
     if (index < 1)
-        return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_nil());
+        return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_nil());
     
     channel_t *c = (channel_t *)janet_abstract(&channel_type, sizeof(channel_t));
     memset(c, 0x0, sizeof(channel_t));
-    
     c->is_initialized = FALSE;
     c->index = index;
     FT_STATUS status = SPI_OpenChannel((index - 1), &c->handle);
-    if (status != FT_OK)
+    if (status != FT_OK) {
+        SPI_CloseChannel(c->handle);
         return set_status_dyn(status, janet_wrap_nil());
-
-    FT_DEVICE_LIST_INFO_NODE chaninfo;
-    status = SPI_GetChannelInfo((index - 1), &chaninfo);
-    if (status != FT_OK) { // bailout if we fail here
-        SPI_CloseChannel(c->handle); // probably will also quietly fail but better to be sure
-        c->handle = NULL;
-        janet_panicf("failed to get channel info on a newly opened channel: %s", ft_status_string(status));
     }
-    c->id = chaninfo.ID;
 
     return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
@@ -272,7 +254,8 @@ JANET_FN(cfun_spi_find,
 
 JANET_FN(cfun_spi_is_open,
     "(spi/is-open channel)",
-    "Returns true if a channel is open, or false if closed or invalid. Sets `:err` to return status.\n\n"
+    "Returns true if a channel is open, or false if closed or invalid. "
+    "Sets `*ft-err*` to return status.\n\n"
     "Takes either an `<spi/channel>` object, or 1-based `index`.") {
     janet_fixarity(argc, 1);
 
@@ -284,11 +267,11 @@ JANET_FN(cfun_spi_is_open,
         index = c->index;
     } // fall thru if we have a channel index
     
-    if (janet_checktype(argv[0], JANET_NUMBER) || index > 0) {
+    if (index > 0 || janet_checktype(argv[0], JANET_NUMBER)) {
         FT_DEVICE_LIST_INFO_NODE chaninfo;
         if (index == 0)
             if ((index = janet_getuinteger(argv, 0)) == 0)
-                return set_status_dyn(FT_INVALID_HANDLE, janet_wrap_boolean(FALSE));
+                return set_status_dyn(FT_INVALID_PARAMETER, janet_wrap_boolean(FALSE));
 
         FT_STATUS status = SPI_GetChannelInfo((index - 1), &chaninfo);
         if (status != FT_OK)
@@ -318,31 +301,31 @@ uint32_t spi_transfer_option_keywords(int32_t argc, Janet *argv) {
 
 JANET_FN(cfun_spi_set_write_options,
     "(spi/write-opt channel &opt kw ...)",
-    "Set SPI Write transfer options. Takes zero, or more keywords:\n\n"
+    "Set SPI Write transfer options. Takes zero or more keywords\n\n"
     "* `:size-in-bits`      - Transfer size in bits (default is bytes)\n"
-    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n") {
+    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n"
+    "Returns `channel`.") {
     janet_arity(argc, 1, 3);
-
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->write_options = spi_transfer_option_keywords(argc, argv);
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_spi_set_read_options,
     "(spi/read-opt channel &opt kw ...)",
     "Set SPI Read transfer options. Takes zero, or more keywords:\n\n"
     "* `:size-in-bits`      - Transfer size in bits (default is bytes)\n"
-    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n") {
+    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n"
+    "Returns `channel`.") {
     janet_arity(argc, 1, 3);
-
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->read_options = spi_transfer_option_keywords(argc, argv);
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_spi_set_config_options,
     "(spi/config channel &opt kw ...)",
-    "Set channel config options. Takes one or more keywords:\n\n"
+    "Set channel config options. Takes zero or more keywords:\n\n"
     "* `:mode0`             - CPOL=0 CPHA=0 (default)\n"
     "* `:mode1`             - CPOL=0 CPHA=1\n"
     "* `:mode2`             - CPOL=1 CPHA=0\n"
@@ -350,7 +333,7 @@ JANET_FN(cfun_spi_set_config_options,
     "* `:bus_`              - Use chip select bus line `:bus3` to `7` (default :bus3)\n"
     "* `:active-low`        - Set chip select line to Active Low\n"
     "* `:active-high`       - Set chip select line to Active High (default)\n\n"
-    "Passing `nil` will reset to default; passing only the channel returns the config value\n\n"
+    "Passing `nil` resets to defaults. Returns `channel`.\n\n"
     "Note: \n"
     "* Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel "
     "is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSE" 
@@ -360,9 +343,6 @@ JANET_FN(cfun_spi_set_config_options,
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     uint32_t options = c->config.configOptions;
-    
-    if (argc == 1) 
-        return set_status_dyn(FT_OK, janet_wrap_integer(options));        /* (spi/config chan) -> raw config value */
     if (argc == 2 && janet_checktype(argv[1], JANET_NIL))
         options = 0x00;                                     /* (spi/config chan nil) resets to defaults (mode0, bus3, active-high) */
     else {
@@ -402,13 +382,13 @@ JANET_FN(cfun_spi_set_config_options,
     FT_STATUS status = FT_OK;
     if (c->is_initialized == TRUE && c->handle)
         status = SPI_ChangeCS(c->handle, c->config.configOptions);
-
-    return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_spi_togglecs,
     "(spi/toggle-cs channel bool)",
-    "Toggles the current chip select line on or off") {
+    "Toggles the current chip select line on or off. Returns `channel`, "
+    "or `nil` on error and sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 2);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
@@ -416,7 +396,9 @@ JANET_FN(cfun_spi_togglecs,
     
     BOOL value = janet_getboolean(argv, 1);
     FT_STATUS status = SPI_ToggleCS(c->handle, value);
-    return set_status_dyn(status, janet_wrap_nil());
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_spi_pins,
@@ -456,7 +438,7 @@ JANET_FN(cfun_spi_pins,
 JANET_FN(cfun_spi_initchannel,
     "(spi/init channel clockrate &opt latency)",
     "Initialize an opened `channel`, `clockrate` and optional `latency`. "
-    "Returns `true` if successful, or `false` on error. Sets :err to return status.\n\n"
+    "Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "* clockrate   - 0 to 30,000,000 Hz\n"
     "* latency     - 0 to 255 (default)\n\n"
     "Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, "
@@ -477,15 +459,17 @@ JANET_FN(cfun_spi_initchannel,
     c->config.LatencyTimer = (uint8_t)latency;
 
     FT_STATUS status = SPI_InitChannel(c->handle, &c->config);
-    if (status == FT_OK)
+    if (status == FT_OK) {
         c->is_initialized = TRUE;
-    return set_status_dyn(status, janet_wrap_boolean(status == FT_OK));
+        return set_status_dyn(FT_OK, janet_wrap_abstract(c));
+    } else
+        return set_status_dyn(status, janet_wrap_nil());
 }
 
 JANET_FN(cfun_spi_closechannel,
     "(spi/close channel)",
     "Closes the specified channel. "
-    "Returns `true` if successful. Sets `:err` to return status.") {
+    "Returns `true` if successful. Sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);   
@@ -502,13 +486,13 @@ JANET_FN(cfun_spi_closechannel,
 JANET_FN(cfun_spi_deviceread,
     "(spi/read channel buffer size)",
     "Read & append `size` n-bytes to `buffer`\n\n"
-    "Returns bytes read. Sets `:err` to return status.\n\n"
+    "Returns `buffer`, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 3);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
     
     uint32_t size = janet_getuinteger(argv, 2);
     if (size < 1)
@@ -526,13 +510,15 @@ JANET_FN(cfun_spi_deviceread,
     if (readsz > 0)
         buffer->count += readsz;
 
-    return set_status_dyn(status, janet_wrap_integer(readsz));
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_buffer(buffer));
 }
 
 JANET_FN(cfun_spi_devicewrite,
     "(spi/write channel buffer &opt size)",
     "Write optional `size` n-bytes of `buffer`\n\n"
-    "Returns bytes written. Sets `:err` to return status.\n\n"
+    "Returns bytes written. Sets `*ft-err*` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_arity(argc, 2, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
@@ -586,14 +572,14 @@ JANET_FN(cfun_spi_devicewrite,
 JANET_FN(cfun_spi_readwrite,
     "(spi/readwrite channel sendbuf size recvbuf)",
     "Simultaneously read & write `size` n-bytes to `channel`.\n\n"
-    "Returns bytes transfered. Sets `:err` to return status.\n\n"
+    "Returns `recvbuf` buffer, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "Note: Uses the `write-opt` transfer option for both operations.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     uint32_t size = janet_getuinteger(argv, 2);
     if (size == 0)
@@ -615,13 +601,15 @@ JANET_FN(cfun_spi_readwrite,
                                     c->write_options);
     if (transfer_sz > 0)
         recvbuf->count += transfer_sz;
-    return set_status_dyn(status, janet_wrap_integer(transfer_sz));
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_buffer(recvbuf));
 }
 
 JANET_FN(cfun_spi_is_busy,
     "(spi/is-busy channel)",
     "Reads the state of the MISO line without clocking the SPI bus.\n\n"
-    "Returns boolean state. Sets `:err` to return status.") {
+    "Returns boolean state. Sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
@@ -637,7 +625,7 @@ JANET_FN(cfun_spi_gpio_write,
     "(spi/gpio-write channel dir value)",
     "Write to GPIO lines, where `direction` and `value` are an 8-bit value mapping each line. "
     "Direction bit 0 for in, and 1 for out. Value is 0 logic low, 1 logic high.\n\n"
-    "Returns `nil`. Sets `:err` to return status.\n\n"
+    "Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in "
     "FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.") {
     janet_fixarity(argc, 3);
@@ -654,14 +642,16 @@ JANET_FN(cfun_spi_gpio_write,
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     FT_STATUS status = FT_WriteGPIO(c->handle, (uint8_t)dir, (uint8_t)value);
-    return set_status_dyn(status, janet_wrap_nil());
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(status, janet_wrap_abstract(c));
 }
 
 JANET_FN(cfun_spi_gpio_read, 
     "(spi/gpio-read channel)", 
     "Read the 8 GPIO lines from the high byte of the MPSSE channel.\n\n"
-    "Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return status.\n\n"
-    "Note: **Must call write-gpio to initialize before reading**. See the libMPSSE AN-178.") {
+    "Returns an unsigned 8-bit integer, or `nil` on error. Sets `*ft-err*` to return status.\n\n"
+    "Note: **Must call `write-gpio` to initialize before reading**. See the libMPSSE AN-178.") {
     janet_fixarity(argc, 1);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
@@ -670,12 +660,15 @@ JANET_FN(cfun_spi_gpio_read,
 
     uint8_t value = 0;
     FT_STATUS status = FT_ReadGPIO(c->handle, &value);
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_integer(value));
 }
 
 JANET_FN(cfun_spi_loopback,
     "(spi/loopback channel bool)",
-    "Enables the `channel`s internal loopback. Returns `nil`.") {
+    "Enables the `channel` internal loopback. "
+    "Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 2);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
@@ -685,14 +678,13 @@ JANET_FN(cfun_spi_loopback,
     FT_STATUS status;
     status = Mid_SetDeviceLoopbackState(c->handle, enable);
     if (status != FT_OK)
-        janet_panicf("failed to set device loopback: %s", ft_status_string(status));
-    return set_status_dyn(FT_OK, janet_wrap_nil());
+        return set_status_dyn(status, janet_wrap_nil());
+    return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
 static JanetMethod channel_methods[] = {
     {"err",             cfun_spi_get_err},
     {"info",            cfun_spi_getchannelinfo},
-    {"id",              cfun_spi_get_id},
     {"is-open",         cfun_spi_is_open},
     {"is-busy",         cfun_spi_is_busy},
     {"close",           cfun_spi_closechannel},
@@ -739,7 +731,6 @@ void spi_register(JanetTable *env) {
         JANET_REG("spi/channels",       cfun_spi_channelcount),
         JANET_REG("spi/info",           cfun_spi_getchannelinfo),
         JANET_REG("spi/find-by",        cfun_spi_find),
-        JANET_REG("spi/id",             cfun_spi_get_id),
         JANET_REG("spi/read-opt",       cfun_spi_set_read_options),
         JANET_REG("spi/write-opt",      cfun_spi_set_write_options),
         JANET_REG("spi/config",         cfun_spi_set_config_options),
