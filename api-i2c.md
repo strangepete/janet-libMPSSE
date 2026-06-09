@@ -8,7 +8,7 @@
 **keyword**  | [source][37]
 
 ```janet
-:ft-err
+(dyn *ft-err*)
 ```
 
 Error status dynamic binding. Represents FT_STATUS as a Janet keyword (`:ok`)
