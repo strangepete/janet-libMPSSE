@@ -52,8 +52,11 @@
 /******************************************************************************/
 
 #ifdef INFRA_DEBUG_ENABLE
-	int currentDebugLevel = MSG_INFO;
-	//int currentDebugLevel = MSG_DEBUG;
+	#ifdef INFRA_DEBUG_LEVEL
+		int currentDebugLevel = INFRA_DEBUG_LEVEL;
+	#else
+		int currentDebugLevel = MSG_INFO;
+	#endif
 #endif
 
 /* Handle to D2XX driver */
