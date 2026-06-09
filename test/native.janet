@@ -1,8 +1,9 @@
 (use ../libmpsse)
 
-(let [[l d] (ft/version)]
-      (printf "libMPSSE Version: %d.%d.%d" ;l)
-      (printf "ftd2xx Version: %d.%d.%d\n" ;d))
+(let [[l d m] (ft/version)]
+  (printf "LibMPSSE:\t%d.%d.%d" ;l)
+  (printf "FTD2xx:\t\t%d.%d.%d" ;d)
+  (printf "janet-libmpsse: %d.%d.%d\n" ;m))
 (assert (= :ok (i2c/err)) (i2c/err))
 
 # I2C
@@ -27,6 +28,7 @@
                    (if (number? v)
                      (string/format "0x%X" v)
                      v)))
+          (assert (i2c/init c :fast))
           (assert (:close c))
           (assert (= :ok (:err c)))
           (assert (not (:is-open c)))
@@ -50,7 +52,7 @@
           (prin "init...")
           (def sendbuf (buffer/new-filled 64 0xBA))
           (def recvbuf @"")
-          (spi/init c 1_000_000)
+          (assert (spi/init c 1_000_000))
           (assert (= :ok (:err c)) (spi/err))
           (prin "loopback test...")(flush)
           (spi/loopback c true)

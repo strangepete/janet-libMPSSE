@@ -9,7 +9,7 @@ typedef struct {
     uint32_t        index;          // 1-based, as user-entered
     FT_HANDLE       handle;
     ChannelConfig   config;
-    uint32_t        read_options;   // these are use per-read/write
+    uint32_t        read_options;   // these are use-per-read/write
     uint32_t        write_options;  //
 } channel_t;
 
@@ -72,6 +72,7 @@ JANET_FN(cfun_spi_get_err,
     "* `:device-list-not-ready`\n\n"
     "Note: currently a wrapper for (dyn *ft-err*)") {
     janet_arity(argc, 0, 1);
+    (void) argv;
     return janet_dyn("ft-err");
 }
 
@@ -82,6 +83,7 @@ JANET_FN(cfun_spi_channelcount,
     "Note: The number of ports available in each chip is different, but must be an MPSSE chip or cable.\n\n"
     "This function is **not thread-safe**.") {
     janet_fixarity(argc, 0);
+    (void) argv;
     uint32_t chans = 0;
     FT_STATUS status = SPI_GetNumChannels(&chans);
     return set_status_dyn(status, janet_wrap_integer(chans));
@@ -95,7 +97,7 @@ JANET_FN(cfun_spi_getchannelinfo,
     "On success, returns a table:\n"
     "* `:serial`      - Serial number of the device\n"
     "* `:description` - Device description\n"
-    "* `:id`          - Unique channel ID\n"
+    "* `:id`          - Device ID\n"
     "* `:locid`       - USB location ID\n"
     "* `:handle`      - Device handle (internal pointer)\n"
     "* `:type`        - Device type\n"
@@ -147,11 +149,8 @@ JANET_FN(cfun_spi_openchannel,
     c->is_initialized = FALSE;
     c->index = index;
     FT_STATUS status = SPI_OpenChannel((index - 1), &c->handle);
-    if (status != FT_OK) {
-        SPI_CloseChannel(c->handle);
+    if (status != FT_OK)
         return set_status_dyn(status, janet_wrap_nil());
-    }
-
     return set_status_dyn(FT_OK, janet_wrap_abstract(c));
 }
 
@@ -164,12 +163,12 @@ JANET_FN(cfun_spi_openchannel,
 JANET_FN(cfun_spi_find,
     "(spi/find-by kw value)",
     "Find a channel matching an explicit identifer. Takes a keyword and value:\n"
-    "* `:id`    - unique channel ID (integer)\n"
+    "* `:id`    - Device ID (integer)\n"
     "* `:locid` - USB location ID (integer)\n"
     "* `:type`  - Device type (integer)\n"
     "* `:description` - (string)\n"
     "* `:serial`    - (string)\n\n"
-    "Returns a channel `index` or `nil` on failure. Sets `:err` to return status.") {
+    "Returns a channel `index` or `nil` on failure and sets `*ft-err*` to return status.") {
     janet_fixarity(argc, 2);
 
     if (!janet_checktype(argv[0], JANET_KEYWORD))
@@ -301,10 +300,10 @@ uint32_t spi_transfer_option_keywords(int32_t argc, Janet *argv) {
 
 JANET_FN(cfun_spi_set_write_options,
     "(spi/write-opt channel &opt kw ...)",
-    "Set SPI Write transfer options. Takes zero or more keywords\n\n"
+    "Set SPI Write transfer options. Returns `channel`. "
+    "Takes zero or more keywords\n\n"
     "* `:size-in-bits`      - Transfer size in bits (default is bytes)\n"
-    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n"
-    "Returns `channel`.") {
+    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n") {
     janet_arity(argc, 1, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->write_options = spi_transfer_option_keywords(argc, argv);
@@ -313,10 +312,10 @@ JANET_FN(cfun_spi_set_write_options,
 
 JANET_FN(cfun_spi_set_read_options,
     "(spi/read-opt channel &opt kw ...)",
-    "Set SPI Read transfer options. Takes zero, or more keywords:\n\n"
+    "Set SPI Read transfer options. Returns `channel`. "
+    "Takes zero, or more keywords:\n\n"
     "* `:size-in-bits`      - Transfer size in bits (default is bytes)\n"
-    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n"
-    "Returns `channel`.") {
+    "* `:cs`                - Chip-select line asserted before beginning transfer\n\n") {
     janet_arity(argc, 1, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->read_options = spi_transfer_option_keywords(argc, argv);
@@ -446,7 +445,7 @@ JANET_FN(cfun_spi_initchannel,
     janet_arity(argc, 2, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_boolean(FALSE));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     uint32_t clock = janet_getuinteger(argv, 1);
         if (clock > 30000000)
@@ -458,12 +457,18 @@ JANET_FN(cfun_spi_initchannel,
         janet_panicf("latency %d out of range. expected 0 to 255", latency);
     c->config.LatencyTimer = (uint8_t)latency;
 
-    FT_STATUS status = SPI_InitChannel(c->handle, &c->config);
+    FT_STATUS status;
+    status = Mid_ResetMPSSE(c->handle); // Reset MPSSE; SPI_InitChannel bug prevents FT_InitChannel from resetting (ftdi_mid.c)
+    if (status != FT_OK) goto fail;
+    status = Mid_PurgeDevice(c->handle);
+    if (status != FT_OK) goto fail;
+    status = SPI_InitChannel(c->handle, &c->config);
     if (status == FT_OK) {
         c->is_initialized = TRUE;
         return set_status_dyn(FT_OK, janet_wrap_abstract(c));
-    } else
-        return set_status_dyn(status, janet_wrap_nil());
+    }
+    fail:
+    return set_status_dyn(status, janet_wrap_nil());
 }
 
 JANET_FN(cfun_spi_closechannel,
@@ -486,7 +491,8 @@ JANET_FN(cfun_spi_closechannel,
 JANET_FN(cfun_spi_deviceread,
     "(spi/read channel buffer size)",
     "Read & append `size` n-bytes to `buffer`\n\n"
-    "Returns `buffer`, or `nil` on error and sets `*ft-err*` to return status.\n\n"
+    "Returns `buffer`, or `nil` on error and sets `*ft-err*` to return status. "
+    "Partial reads are still stored in buffer.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 3);
 
@@ -494,7 +500,7 @@ JANET_FN(cfun_spi_deviceread,
     if (NULL == c->handle)
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
     
-    uint32_t size = janet_getuinteger(argv, 2);
+    int32_t size = janet_getinteger(argv, 2);
     if (size < 1)
         janet_panic("read size must be greater than 0");
 
@@ -509,7 +515,6 @@ JANET_FN(cfun_spi_deviceread,
                                 c->read_options);
     if (readsz > 0)
         buffer->count += readsz;
-
     if (status != FT_OK)
         return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_buffer(buffer));
@@ -518,12 +523,12 @@ JANET_FN(cfun_spi_deviceread,
 JANET_FN(cfun_spi_devicewrite,
     "(spi/write channel buffer &opt size)",
     "Write optional `size` n-bytes of `buffer`\n\n"
-    "Returns bytes written. Sets `*ft-err*` to return status.\n\n"
+    "Returns bytes written, or `nil` on error and sets `*ft-err*` to return status.\n\n"
     "This is a **blocking function**.") {
     janet_arity(argc, 2, 3);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
     
     uint32_t size = 0;
     if (argc == 3) { // optional size
@@ -547,14 +552,18 @@ JANET_FN(cfun_spi_devicewrite,
         if (janet_checktype(argv[1], JANET_STRING)) {
             JanetString s = janet_getstring(argv, 1);
             size_t len = janet_string_length(s);
-            if (size == 0)
+            if (0 == len)
+                janet_panic("write string length must be > 0");
+            if (0 == size)
                 size = len;
             else if (size > len)
                 janet_panicf("write size %d larger than string size %d", size, len);
             buf = (uint8_t *)s;
         } else {
             JanetBuffer *buffer = janet_getbuffer(argv, 1);
-            if (size == 0)
+            if (0 == buffer->count)
+                janet_panic("write buffer must be > 0");
+            if (0 == size)
                 size = buffer->count;
             else if (size > buffer->count)
                 janet_panicf("write size %d larger than buffer size %d", size, buffer->count);
@@ -566,13 +575,16 @@ JANET_FN(cfun_spi_devicewrite,
                         size,     
                         &writesz, 
                         c->write_options);
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_integer(writesz));
 }
 
 JANET_FN(cfun_spi_readwrite,
     "(spi/readwrite channel sendbuf size recvbuf)",
     "Simultaneously read & write `size` n-bytes to `channel`.\n\n"
-    "Returns `recvbuf` buffer, or `nil` on error and sets `*ft-err*` to return status.\n\n"
+    "Returns `recvbuf` buffer, or `nil` on error and sets `*ft-err*` to return status. "
+    "Partial reads will still be stored in buffer.\n\n"
     "Note: Uses the `write-opt` transfer option for both operations.\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
@@ -582,10 +594,12 @@ JANET_FN(cfun_spi_readwrite,
         return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
 
     uint32_t size = janet_getuinteger(argv, 2);
-    if (size == 0)
+    if (0 == size)
         janet_panicf("buffer size %d is out of range. Expected > 0", size);
 
     JanetBuffer *sendbuf = janet_getbuffer(argv, 1);
+    if (sendbuf->count == 0)
+        janet_panic("write buffer must be > 0");
     if (size > sendbuf->count)
         janet_panicf("write size %d larger than sendbuf size %d", size, sendbuf->count);
 
@@ -633,7 +647,7 @@ JANET_FN(cfun_spi_gpio_write,
     uint32_t dir = janet_getuinteger(argv, 1);
     uint32_t value = janet_getuinteger(argv, 2);
     if (dir > 255)
-        janet_panic("value must be <= 255, in slot #1");
+        janet_panic("direction must be <= 255, in slot #1");
     if (value > 255)
         janet_panic("value must be <= 255, in slot #2");
 

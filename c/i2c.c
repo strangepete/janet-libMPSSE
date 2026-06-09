@@ -70,6 +70,7 @@ JANET_FN(cfun_i2c_get_err,
     "* `:device-list-not-ready`\n\n"
     "Note: currently a wrapper for (dyn *ft-err*)") {
     janet_arity(argc, 0, 1);
+    (void) argv;
     return janet_dyn("ft-err");
 }
 
@@ -80,6 +81,7 @@ JANET_FN(cfun_i2c_channelcount,
     "Note: The number of ports available in each chip is different, but must be an MPSSE chip or cable.\n\n"
     "This function is **not thread-safe**.") {
     janet_fixarity(argc, 0);
+    (void) argv;
     uint32_t chans = 0;
     FT_STATUS status = I2C_GetNumChannels(&chans);
     return set_status_dyn(status, janet_wrap_integer(chans));
@@ -161,7 +163,7 @@ JANET_FN(cfun_i2c_openchannel,
 JANET_FN(cfun_i2c_find,
     "(i2c/find-by kw value)",
     "Find a channel matching an explicit identifer. Takes a keyword and value:\n"
-    "* `:id`    - unique channel ID (integer)\n"
+    "* `:id`    - Device ID (integer)\n"
     "* `:locid` - USB location ID (integer)\n"
     "* `:type`  - Device type (integer)\n"
     "* `:description` - (string)\n"
@@ -319,8 +321,7 @@ JANET_FN(cfun_i2c_set_write_options,
     "* `:break-on-nak`\n"
     "* `:fast-transfer-bytes`\n"
     "* `:fast-transfer-bits`\n"
-    "* `:no-address`\n\n"
-    "Returns `channel`.") {
+    "* `:no-address`\n\n") {
     janet_arity(argc, 1, 6);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->write_options = transfer_option_keywords(argc, argv, WRITE_TRANSFER_OPT);
@@ -329,14 +330,14 @@ JANET_FN(cfun_i2c_set_write_options,
 
 JANET_FN(cfun_i2c_set_read_options,
     "(i2c/read-opt channel &opt kw ...)",
-    "Set I2C Read transfer options. Takes zero, or more keywords:\n\n"
+    "Set I2C Read transfer options. Returns `channel`. "
+    "Takes zero, or more keywords:\n\n"
     "* `:start`\n"
     "* `:stop`\n"
     "* `:nak-last-byte`\n"
     "* `:fast-transfer-bytes`\n"
     "* `:fast-transfer-bits`\n"
-    "* `:no-address`\n\n"
-    "Returns `channel`.") {
+    "* `:no-address`\n\n") {
     janet_arity(argc, 1, 6);
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);
     c->read_options = transfer_option_keywords(argc, argv, READ_TRANSFER_OPT);
@@ -455,7 +456,7 @@ JANET_FN(cfun_ft_gpio_write,
     uint32_t dir = janet_getuinteger(argv, 1);
     uint32_t value = janet_getuinteger(argv, 2);
     if (dir > 255)
-        janet_panic("value must be <= 255, in slot #1");
+        janet_panic("direction must be <= 255, in slot #1");
     if (value > 255)
         janet_panic("value must be <= 255, in slot #2");
 
@@ -490,7 +491,10 @@ JANET_FN(cfun_ft_gpio_read,
 JANET_FN(cfun_i2c_deviceread,
     "(i2c/read channel address buffer size)",
     "Read & append `size` n-bytes to `buffer` from I2C device at `address`.\n\n"
-    "Returns `buffer`, or `nil` and sets `*ft-err*` to return status.\n\n"
+    "Returns `buffer`, or `nil` on error and sets `*ft-err*` to return status. "
+    "Special status meanings:\n\n"
+    "* `:io-error`         - Failed while transfering data, still stored in buffer\n"
+    "* `:device-not-found` - I2C slave did not respond, transfer not started\n\n"
     "This is a **blocking function**.") {
     janet_fixarity(argc, 4);
     
@@ -502,7 +506,7 @@ JANET_FN(cfun_i2c_deviceread,
     if (address > 127)
         janet_panicf("i2c address %d is out of range. Expected 7-bit address <= 127.", address);
         
-    uint32_t size = janet_getuinteger(argv, 3);
+    int32_t size = janet_getinteger(argv, 3);
     if (size < 1)
         janet_panic("read size must be greater than 0");
 
@@ -518,7 +522,6 @@ JANET_FN(cfun_i2c_deviceread,
                                       c->read_options);
     if (readsz > 0)
         buffer->count += readsz;
-
     if (status != FT_OK)
          return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_buffer(buffer));
@@ -527,13 +530,17 @@ JANET_FN(cfun_i2c_deviceread,
 JANET_FN(cfun_i2c_devicewrite,
     "(i2c/write channel address buffer &opt size)",
     "Write optional `size` n-bytes of `buffer` to I2C channel/device `address`.\n\n"
-    "Returns bytes written. Sets `*ft-err*` to return status.\n\n"
+    "Returns bytes written, or `nil` on error and sets `*ft-err*` to return status. "
+    "Special status meanings:\n\n"
+    "* `:io-error`               - Failed while transfering data\n"
+    "* `:device-not-found`       - I2C slave did not respond, transfer not started\n"
+    "* `:failed-to-write-device` - I2C slave NAKed\n\n"
     "This is a **blocking function**.") {
     janet_arity(argc, 3, 4);
 
     channel_t *c = (channel_t *)janet_getabstract(argv, 0, &channel_type);    
     if (NULL == c->handle)
-        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_integer(0));
+        return set_status_dyn(FT_DEVICE_NOT_OPENED, janet_wrap_nil());
     
     uint32_t address = janet_getuinteger(argv, 1);
     if (address > 127)
@@ -561,14 +568,18 @@ JANET_FN(cfun_i2c_devicewrite,
         if (janet_checktype(argv[2], JANET_STRING)) {
             JanetString s = janet_getstring(argv, 2);
             size_t len = janet_string_length(s);
-            if (size == 0)
+            if (0 == len)
+                janet_panic("write string length must be > 0");
+            if (0 == size)
                 size = len;
             else if (size > len)
                 janet_panicf("write size %d larger than string size %d", size, len);
             buf = (uint8_t *)s;
         } else {
             JanetBuffer *buffer = janet_getbuffer(argv, 2);
-            if (size == 0)
+            if (0 == buffer->count)
+                janet_panic("write buffer must be > 0");
+            if (0 == size)
                 size = buffer->count;
             else if (size > buffer->count)
                 janet_panicf("write size %d larger than buffer count %d", size, buffer->count);
@@ -581,6 +592,8 @@ JANET_FN(cfun_i2c_devicewrite,
                              buf, 
                              &writesz, 
                              c->write_options);
+    if (status != FT_OK)
+        return set_status_dyn(status, janet_wrap_nil());
     return set_status_dyn(status, janet_wrap_integer(writesz));
 }
 
@@ -593,19 +606,26 @@ static Janet version_to_tuple(uint32_t ver) {
     return janet_wrap_tuple(janet_tuple_n(vals, 3));
 }
 
+#ifndef JANET_LIBMPSSE_VERSION 
+    #define JANET_LIBMPSSE_VERSION 0x000001 // v0.0.1
+    #pragma message ("warning: JANET_LIBMPSSE_VERSION was not defined")
+#endif
+
 JANET_FN(cfun_ft_ver_libmpsse,
     "(ft/version)",
-    "Return a tuple of the libMPSSE and ftd2xx version numbers each as [major minor build]") {
+    "Return a tuple of the libMPSSE, ftd2xx, and janet module version numbers each as [major minor build]") {
+    janet_fixarity(argc, 0);
+    (void) argv;
     uint32_t libmpsse, ftd2xx;
-
     FT_STATUS status = Ver_libMPSSE(&libmpsse, &ftd2xx);
     if (status != FT_OK)
         return set_status_dyn(status, janet_wrap_nil());
     
-    Janet vals[2] = {version_to_tuple(libmpsse),
-                     version_to_tuple(ftd2xx)};
+    Janet vals[3] = {version_to_tuple(libmpsse),
+                     version_to_tuple(ftd2xx),
+                     version_to_tuple(JANET_LIBMPSSE_VERSION)};
 
-    return set_status_dyn(FT_OK, janet_wrap_tuple(janet_tuple_n(vals, 2)));
+    return set_status_dyn(FT_OK, janet_wrap_tuple(janet_tuple_n(vals, 3)));
 }
 
 static JanetMethod channel_methods[] = {

@@ -2,7 +2,7 @@
 
 [Janet language](https://janet-lang.org) bindings to [FTDI's libMPSSE library](https://ftdichip.com/software-examples/mpsse-projects/) for I2C and Serial communications on Windows & Linux.
 
-LibMPSSE is a library written by FTDI to simplify I2C, SPI and JTAG development, as configuring the underlying MPSSE hardware is fairly complex. JTAG is not yet implemented here.
+LibMPSSE is a library written by FTDI to simplify I2C, SPI development, as configuring the underlying MPSSE hardware is fairly complex.
 
 The Multi-Protocol Synchronous Serial Engine (MPSSE) is a piece of hardware available in some FTDI chips and cables that allows for configurable serial communication with devices, such as I2C, SPI, and JTAG, through their D2XX driver. Commands are sent to the MPSSE to execute, such as sending data, setting the clock, protocol features, or setting GPIO lines. While the chip will also appear as a Virtual COM port, that feature is not used here.
 
@@ -17,7 +17,7 @@ The module can be imported in a script or the REPL:
 ```janet
 (use libmpsse)
 ```
-which loads two submodules, `i2c/` and `spi/` which are generally the same, except the I2C functions take a 7-bit I2C address. Many functions can be called as methods on an opened channel, such as `(i2c/err)` or `(:err c)` and `(:close c)`
+which loads two submodules, `i2c/` and `spi/` which are generally the same, except the I2C functions take a 7-bit I2C address. Many functions can also be called as methods on an opened channel, such as `(i2c/err)` or `(:err chan)` and `(:close chan)`
 
 Getting a channel's information:
 ```janet
@@ -37,20 +37,16 @@ Getting a channel's information:
 This is an example flow for opening a new I2C channel:
 ```janet
 (if (> (i2c/channels) 0)
-  (with [c (i2c/open 1)]                         # Open the first channel
-    (when (not= :ok (i2c/err c))                 # FT_STATUS error is returned as a keyword, such as :ok or :device-not-opened
-      (error (:err c)))
-    (i2c/write-opt c :start :stop)				
-    (i2c/read-opt c :start :stop :nak-last-byte) # Transfer settings can be changed prior to each read/write call
-  
-    (i2c/init c :fast)                           # Initialize to 400kbs
+  (with [chan (i2c/open 1)]         # Open the first channel
+    (-> chan
+      (:write-opt :start :stop)		  # Transfer settings can be changed prior to each read/write call
+      (:read-opt  :start :stop :nak-last-byte) 
+      (:init :fast)                 # Initialize to 400kbs
+      (:write 0x3C @"\x40\x00" 2))  # Write 2 bytes to address 0x3C
 
-    (:write c 0x3C 2 @"\x40\x00")                # Write 2 bytes to address 0x3C
-
-    (def buf @"")
-    (:read c 0x3C 2 buf)                         # Append 2 bytes from address 0x3C to buffer
-
-    (:close c))                                  # Currently a closed channel object cannot be reopened; use (i2c/open) to create a new one
+    (def buf @"some data: ")
+    (:read chan 0x3C buf 2)         # Append 2 bytes from address 0x3C to buffer
+    (:close chan))                  # Currently a closed channel object cannot be reopened; use (i2c/open) to create a new one
   (print "no channel found"))
 ```
 
@@ -59,7 +55,10 @@ The various transfer and config options are lightly documented in [api-i2c.md](a
 > The `/read` and `/write` functions are **blocking**, and `/channels` and `/info` are **not thread-safe**
 
 ## Installation
-This module has been primarily written and tested on Windows 10 x64, and lighly tested on Debian 12.11/Proxmox VM with usb passthru.
+This module has been primarily written and tested on:
+ * Windows 10 x64
+ * lighly tested on Debian 12.11/Proxmox VM with usb passthru.
+ * Fedora 44 amd64
 
 Documentation is generated using [documentarian](https://github.com/pyrmont/documentarian). 
 
@@ -82,6 +81,8 @@ jpm build
 jpm test
 jpm install
 ```
+
+Enable debug with `set "INFRA_DEBUG=1"` or, optionally `set INFRA_DEBUG_LEVEL=7` to a range of 0-7, with 7 being the most verbose. The ASan DLL needs to be found in `PATH`, or Janet will return a generic *"The Specified Module Cannot Be Found."* This path should be setup by using the Developer Console.
 
 ### Linux
 > The underlying d2xx library uses libusb and requires kernel level access to the device, which means any use of the library, including `jpm test` needs to be run with `sudo` or as root. There are work-arounds but they are beyond the scope of this document.
@@ -113,12 +114,14 @@ sudo rmmod usbserial
 ## Notes
 
 * libMPSSE can **_only operate as an I2C/SPI bus master_**. Many GPS devices also talk as master, and as such cannot be used to get nema messages :(
-* JTAG is planned but not yet implemented (which is actually a separate library despite the marketing)
+* JTAG is no longer planned, the library is no longer developed by FTDI.
 * On linux, [libftdi](https://www.intra2net.com/en/developer/libftdi/) ***is not*** d2xx; I think it would be worth targeting next, being open source and easily cross-platform.
 
 ## Known issues
 
-* Underlying libusb or USB device presence/permission issues *may* show as functions returning `FT_OTHER_ERROR`
+* LibMPSSE reports misleading `invalid index 0 (valid range: 0 to 4294967295)` when no channels found
+* Underlying libusb or USB device presence/permission issues *may* show as functions returning `:other-error`
+* Rapid hot-plugging can result in an `:insufficient-resources` error, and possible communications issues with SPI. MPSSE is not properly reset, in addition to uninitialized memory use in ftd2xx channel list.
 
 ## Tested Devices
 

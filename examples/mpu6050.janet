@@ -65,16 +65,16 @@
 (defn i2c-write
   "libmpsse i2c/write wrapper. Takes a buffer, or an 8-bit integer."
   [len data]
-  (def chan (dyn :i2c-channel))
-  (def addr (dyn :mpu6050-addr))
-  (i2c/write chan addr data len))
+  (let [chan (dyn :i2c-channel)
+        addr (dyn :mpu6050-addr)]
+    (i2c/write chan addr data len)))
 
 (defn i2c-read
   "libmpsse i2c/read wrapper."
   [len buf]
-  (def chan (dyn :i2c-channel))
-  (def addr (dyn :mpu6050-addr))
-  (i2c/read chan addr buf len))
+  (let [chan (dyn :i2c-channel)
+        addr (dyn :mpu6050-addr)]
+    (i2c/read chan addr buf len)))
 
 (defn c->f
   "Convert Celsius to Fahrenheit"
@@ -327,14 +327,15 @@
   (setdyn :i2c-channel chan)
 
   # MPU specific config:
-  (i2c/write-opt chan :start :stop)
-  (i2c/read-opt chan :start :stop :nak-last-byte)
-  (if (i2c/init chan :fast) # 400kbs is mpu6050 maximum thruput, in practice :fast-plus (1Mbs) works too
-    true
-    (do
-      (eprint "i2c/init failed: " (i2c/err))
-      (i2c/close chan)
-      false)))
+  (if (-> chan
+         (i2c/write-opt :start :stop)
+         (i2c/read-opt :start :stop :nak-last-byte)
+         (i2c/init :fast)) # 400kbs is mpu6050 maximum thruput, in practice :fast-plus (1Mbs) works too
+           true
+           (do
+             (eprint "i2c/init failed: " (i2c/err))
+             (i2c/close chan)
+             false)))
 
 (defn close
   "Deinit MPU, and disconnect i2c"

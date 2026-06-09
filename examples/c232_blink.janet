@@ -8,10 +8,10 @@
 (use libmpsse)
 
 (prin "Waiting for connection...")
-(while (not (i2c/channels))
+(while (zero? (i2c/channels))
          (do
-           (prin ".")
-           (flush)))
+           (prin ".") (flush)
+           (ev/sleep 1)))
 
 # Restrict to C232HM cables only
 (var info (i2c/info 1))
