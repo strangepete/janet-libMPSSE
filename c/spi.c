@@ -335,7 +335,7 @@ JANET_FN(cfun_spi_set_config_options,
     "Passing `nil` resets to defaults. Returns `channel`.\n\n"
     "Note: \n"
     "* Bus corresponds to lines ADBUS0 - ADBUS7 if the first MPSSE channel "
-    "is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSE" 
+    "is used, otherwise it corresponds to lines BDBUS0 - BDBUS7 if the second MPSSE " 
     "channel (i.e., if available in the chip) is used.\n"
     "* FT2xxH/FT2232D only support Modes 0 & 2") {
     janet_arity(argc, 1, 4);

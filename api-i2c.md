@@ -1,6 +1,19 @@
 # libmpsse I2C API
 
-[ft/version](#ftversion), [i2c/channels](#i2cchannels), [i2c/close](#i2cclose), [i2c/config](#i2cconfig), [i2c/err](#i2cerr), [i2c/find-by](#i2cfind-by), [i2c/gpio-read](#i2cgpio-read), [i2c/gpio-write](#i2cgpio-write), [i2c/id](#i2cid), [i2c/info](#i2cinfo), [i2c/init](#i2cinit), [i2c/is-open](#i2cis-open), [i2c/open](#i2copen), [i2c/read](#i2cread), [i2c/read-opt](#i2cread-opt), [i2c/write](#i2cwrite), [i2c/write-opt](#i2cwrite-opt)
+[*ft-err*](#ft-err), [ft/version](#ftversion), [i2c/channels](#i2cchannels), [i2c/close](#i2cclose), [i2c/config](#i2cconfig), [i2c/err](#i2cerr), [i2c/find-by](#i2cfind-by), [i2c/gpio-read](#i2cgpio-read), [i2c/gpio-write](#i2cgpio-write), [i2c/info](#i2cinfo), [i2c/init](#i2cinit), [i2c/is-open](#i2cis-open), [i2c/open](#i2copen), [i2c/read](#i2cread), [i2c/read-opt](#i2cread-opt), [i2c/write](#i2cwrite), [i2c/write-opt](#i2cwrite-opt)
+
+
+## *ft-err*
+
+**keyword**  | [source][37]
+
+```janet
+:ft-err
+```
+
+Error status dynamic binding. Represents FT_STATUS as a Janet keyword (`:ok`)
+
+[37]: libmpsse/init.janet#L3
 
 
 ## ft/version
@@ -11,9 +24,9 @@
 (ft/version)
 ```
 
-Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]
+Return a tuple of the libMPSSE, ftd2xx, and janet module version numbers each as [major minor build]
 
-[1]: c/i2c.c#L602
+[1]: c/i2c.c#L616
 
 
 ## i2c/channels
@@ -24,7 +37,7 @@ Return a tuple of the libMPSSE and ftd2xx version numbers as [major minor build]
 (i2c/channels)
 ```
 
-Get the number of I2C channels that are connected to the host system. Sets `:err` to return status.
+Get the number of I2C channels that are connected to the host system. Sets `*ft-err*` to return status.
 
 Note: The number of ports available in each chip is different, but must be an MPSSE chip or cable.
 
@@ -41,9 +54,9 @@ This function is **not thread-safe**.
 (i2c/close channel)
 ```
 
-Closes the specified channel. Returns `true` if successful. Sets `:err` to return status.
+Closes the specified channel. Returns `true` if successful. Sets `*ft-err*` to return status.
 
-[3]: c/i2c.c#L449
+[3]: c/i2c.c#L434
 
 
 ## i2c/config
@@ -59,9 +72,12 @@ Set channel config options. Takes zero, or more keywords:
 * `:disable-3phase-clocking`
 * `:enable-drive-only-zero`
 
-Note: 3-phase clocking only available on hi-speed devices, not the FT2232D. Drive-only-zero is only available on the FT232H.
+Returns `channel`.
 
-[4]: c/i2c.c#L373
+Note: 
+3-phase clocking only available on hi-speed devices, not the FT2232D. Drive-only-zero is only available on the FT232H.
+
+[4]: c/i2c.c#L357
 
 
 ## i2c/err
@@ -96,9 +112,9 @@ The return status of the last executed I2C function as a keyword representing an
 * `:other-error`
 * `:device-list-not-ready`
 
-Note: currently a wrapper for (dyn :ft-err)
+Note: currently a wrapper for (dyn *ft-err*)
 
-[5]: c/i2c.c#L72
+[5]: c/i2c.c#L71
 
 
 ## i2c/find-by
@@ -110,15 +126,15 @@ Note: currently a wrapper for (dyn :ft-err)
 ```
 
 Find a channel matching an explicit identifer. Takes a keyword and value:
-* `:id`    - unique channel ID (integer)
+* `:id`    - Device ID (integer)
 * `:locid` - USB location ID (integer)
 * `:type`  - Device type (integer)
 * `:description` - (string)
 * `:serial`    - (string)
 
-Returns a channel `index` or `nil` on failure. Sets `:err` to return status.
+Returns a channel `index` or `nil` on failure. Sets `*ft-err*` to return status.
 
-[6]: c/i2c.c#L190
+[6]: c/i2c.c#L171
 
 
 ## i2c/gpio-read
@@ -131,11 +147,11 @@ Returns a channel `index` or `nil` on failure. Sets `:err` to return status.
 
 Read the 8 GPIO lines from the high byte of the MPSSE channel.
 
-Returns an unsigned 8-bit integer, or `nil` on error. Sets `:err` to return status.
+Returns an unsigned 8-bit integer, or `nil` on error. Sets `*ft-err*` to return status.
 
-Note: **Must call write-gpio to initialize before reading**. See the libMPSSE.
+Note: **Must call `write-gpio` to initialize before reading**. See the libMPSSE.
 
-[7]: c/i2c.c#L490
+[7]: c/i2c.c#L477
 
 
 ## i2c/gpio-write
@@ -148,41 +164,28 @@ Note: **Must call write-gpio to initialize before reading**. See the libMPSSE.
 
 Write to GPIO lines, where `direction` and `value` are an 8-bit value mapping each line. Direction bit 0 for in, and 1 for out. Value is 0 logic low, 1 logic high.
 
-Returns `nil`. Sets `:err` to return status.
+Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.
 
 Note: libMPSSE cannot use the lower gpio port pins 0-7, such as those exposed in FTDI cable assemblies. Setting bit-6 corresponds to the onboard red LED in some cables.
 
-[8]: c/i2c.c#L468
-
-
-## i2c/id
-
-**cfunction**  | [source][9]
-
-```janet
-(i2c/id channel)
-```
-
-Takes an `<i2c/channel>` and returns the unique, per-channel ID assigned by libMPSSE on channel creation.
-
-[9]: c/i2c.c#L136
+[8]: c/i2c.c#L453
 
 
 ## i2c/info
 
-**cfunction**  | [source][10]
+**cfunction**  | [source][9]
 
 ```janet
 (i2c/info index)
 ```
 
 Retrieve detailed information about an I2C channel, given a 1-based channel `index`, or an `<i2c/channel>` object.
-Returns `nil` on error. Sets `:err` to return status.
+Returns `nil` on error and sets `*ft-err*` to return status.
 
 On success, returns a table:
 * `:serial`      - Serial number of the device
 * `:description` - Device description
-* `:id`          - Unique channel ID
+* `:id`          - Device ID
 * `:locid`       - USB location ID
 * `:handle`      - Device handle (internal pointer)
 * `:type`        - Device type
@@ -190,18 +193,18 @@ On success, returns a table:
 
 This function is **not thread-safe**.
 
-[10]: c/i2c.c#L103
+[9]: c/i2c.c#L103
 
 
 ## i2c/init
 
-**cfunction**  | [source][11]
+**cfunction**  | [source][10]
 
 ```janet
 (i2c/init channel &opt clockrate latency)
 ```
 
-Initialize an open `channel` with optional `clockrate` and `latency`. Returns `true` if successful, or `false` on error. Sets :err to return status.
+Initialize an open `channel` with optional `clockrate` and `latency`. Returns `channel`, or `nil` on error and sets `*ft-err*` to return status.
 
 Clock rate is one of the following keywords:
 
@@ -213,27 +216,27 @@ Clock rate is one of the following keywords:
 
 Note: Recommended latency of Full-speed devices (FT2232D) is 2 to 255, and Hi-speed devices (FT232H, FT2232H, FT4232H) is 1 to 255. Default is 255.
 
-[11]: c/i2c.c#L407
+[10]: c/i2c.c#L391
 
 
 ## i2c/is-open
 
-**cfunction**  | [source][12]
+**cfunction**  | [source][11]
 
 ```janet
 (i2c/is-open channel)
 ```
 
-Returns true if a channel is open, or false if closed or invalid. Sets `:err` to return status.
+Returns true if a channel is open, or false if closed or invalid. Sets `*ft-err*` to return status.
 
 Takes either an `<i2c/channel>` object, or 1-based `index`.
 
-[12]: c/i2c.c#L276
+[11]: c/i2c.c#L258
 
 
 ## i2c/open
 
-**cfunction**  | [source][13]
+**cfunction**  | [source][12]
 
 ```janet
 (i2c/open index)
@@ -241,39 +244,42 @@ Takes either an `<i2c/channel>` object, or 1-based `index`.
 
 Open a channel by (1-based) `index`.
 
-Returns an `<i2c/channel>` if succesful, or `nil` on error. Sets `:err` to return status.
+Returns an `<i2c/channel>` or `nil` on error and sets `*ft-err*` to return status.
 
 
 
-[13]: c/i2c.c#L146
+[12]: c/i2c.c#L138
 
 
 ## i2c/read
 
-**cfunction**  | [source][14]
+**cfunction**  | [source][13]
 
 ```janet
-(i2c/read channel address size buffer)
+(i2c/read channel address buffer size)
 ```
 
 Read & append `size` n-bytes to `buffer` from I2C device at `address`.
 
-Returns bytes read. Sets `:err` to return status.
+Returns `buffer`, or `nil` on error and sets `*ft-err*` to return status. Special status meanings:
+
+* `:io-error`         - Failed while transfering data, still stored in buffer
+* `:device-not-found` - I2C slave did not respond, transfer not started
 
 This is a **blocking function**.
 
-[14]: c/i2c.c#L506
+[13]: c/i2c.c#L498
 
 
 ## i2c/read-opt
 
-**cfunction**  | [source][15]
+**cfunction**  | [source][14]
 
 ```janet
 (i2c/read-opt channel &opt kw ...)
 ```
 
-Set I2C Read transfer options. Takes zero, or more keywords:
+Set I2C Read transfer options. Returns `channel`. Takes zero, or more keywords:
 
 * `:start`
 * `:stop`
@@ -284,35 +290,39 @@ Set I2C Read transfer options. Takes zero, or more keywords:
 
 
 
-[15]: c/i2c.c#L357
+[14]: c/i2c.c#L340
 
 
 ## i2c/write
 
-**cfunction**  | [source][16]
+**cfunction**  | [source][15]
 
 ```janet
-(i2c/write channel address size buffer)
+(i2c/write channel address buffer &opt size)
 ```
 
-Write `size` n-bytes of `buffer` to I2C channel/device `address`.
+Write optional `size` n-bytes of `buffer` to I2C channel/device `address`.
 
-Returns bytes written. Sets `:err` to return status.
+Returns bytes written, or `nil` on error and sets `*ft-err*` to return status. Special status meanings:
+
+* `:io-error`               - Failed while transfering data
+* `:device-not-found`       - I2C slave did not respond, transfer not started
+* `:failed-to-write-device` - I2C slave NAKed
 
 This is a **blocking function**.
 
-[16]: c/i2c.c#L541
+[15]: c/i2c.c#L538
 
 
 ## i2c/write-opt
 
-**cfunction**  | [source][17]
+**cfunction**  | [source][16]
 
 ```janet
 (i2c/write-opt channel &opt kw ...)
 ```
 
-Set I2C Write transfer options. Takes zero, or more keywords:
+Set I2C Write transfer options. Returns `channel`. Takes zero, or more keywords:
 
 * `:start`
 * `:stop`
@@ -323,4 +333,4 @@ Set I2C Write transfer options. Takes zero, or more keywords:
 
 
 
-[17]: c/i2c.c#L341
+[16]: c/i2c.c#L324
