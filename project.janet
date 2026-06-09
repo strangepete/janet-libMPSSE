@@ -6,43 +6,43 @@
   :license "MIT"
   :url "https://github.com/strangepete/janet-libMPSSE"
   :repo "git+https://github.com/strangepete/janet-libMPSSE.git"
-  :version "0.0.4")
+  :version "0.0.5")
 
-(def debugging (if (= (os/getenv "DEBUG") "1") true false))
-(defn if-debug [x] (if debugging x []))
+(def debug-level (os/getenv "INFRA_DEBUG_LEVEL")) # level of verbosity 0-7
+(def debugging (if (or (os/getenv "INFRA_DEBUG") debug-level) true false))
 (def windows? (if (= (os/which) :windows) true false))
+(def version (string/format "%02x%02x%02x" ;(string/split "." (get (dyn :project) :version))))
 
-(def cflags
+(defmacro ? "platform-specific argument" [& body] ~(string (if windows? "/" "-") ,;body))
+(defn if-debug [x] (if debugging x []))
+
+(def cflags # platform specific
   (case (os/which)
     :windows [;default-cflags
               "/DUNICODE"
               "/D_UNICODE"
-              "/DFT_VER_MAJOR=1" "/DFT_VER_MINOR=0" "/DFT_VER_BUILD=9" # libMPSSE version
-              "/DFTDIMPSSE_STATIC"
-              "/IFTDI_LibMPSSE/release/include"
-              "/IFTDI_LibMPSSE/release/libftd2xx"
               ;(if-debug
-                ["/DINFRA_DEBUG_ENABLE" # libmpsse offers *verbose* debugging
-                 "/fsanitize=address"
-                 "/Z7"
-                 "/D_DEBUG"])]
+               ["/fsanitize=address"
+                "/Z7"])]
     [;default-cflags
-     "-DFT_VER_MAJOR=1" "-DFT_VER_MINOR=0" "-DFT_VER_BUILD=9"
-     "-DFTDIMPSSE_STATIC"
-     "-D_DEFAULT_SOURCE" # needed for usleep()
-     "-IFTDI_LibMPSSE/release/include"
-     "-IFTDI_LibMPSSE/release/libftd2xx"
-     "-IFTDI_LibMPSSE/release/source"
-     ;(if-debug
-       ["-DINFRA_DEBUG_ENABLE" # libmpsse *verbose* debugging
-        "-D_DEBUG"])]))
+     "-D_DEFAULT_SOURCE"])) # needed for usleep()
 
 (declare-source
   :source ["libmpsse/"])
 
 (declare-native
   :name "_libmpsse"
-  :cflags cflags
+  :cflags [;cflags
+           (? "DFTDIMPSSE_STATIC")
+           (? "DJANET_LIBMPSSE_VERSION=0x" version)
+           (? "DFT_VER_MAJOR=1") (? "DFT_VER_MINOR=0") (? "DFT_VER_BUILD=9")
+           (? "IFTDI_LibMPSSE/release/include")
+           (? "IFTDI_LibMPSSE/release/libftd2xx")
+           (? "IFTDI_LibMPSSE/release/source")
+           ;(if-debug
+            [(? "D_DEBUG")
+             (? "DINFRA_DEBUG_ENABLE")
+             ;(if debug-level [(? "DINFRA_DEBUG_LEVEL=" debug-level)] [])])]
   :ldflags [;default-ldflags
             ;(if (and debugging windows?) ["/DEBUG"] [])]
   :source @["FTDI_LibMPSSE/release/source/ftdi_mid.c"
